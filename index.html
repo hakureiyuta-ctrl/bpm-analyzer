@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPM Analyzer Pro Ultra Smooth</title>
+    <title>BPM Analyzer Pro Ultra</title>
     <style>
         body { 
             background: #020617; 
@@ -27,15 +27,29 @@
             box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
             border: 1px solid #334155; 
         }
+        
+        .bpm-container {
+            margin: 5px 0 15px 0;
+        }
+        
         .bpm-display { 
             font-size: 70px; 
             font-weight: 900; 
             color: #10b981; 
-            margin: 5px 0 10px 0; 
             text-shadow: 0 0 20px rgba(16, 185, 129, 0.4); 
             font-variant-numeric: tabular-nums;
             line-height: 1;
         }
+        
+        /* 新機能：倍テンポ表示のデザイン */
+        .bpm-double {
+            font-size: 1.2rem;
+            color: #94a3b8;
+            font-weight: bold;
+            margin-top: 5px;
+            font-variant-numeric: tabular-nums;
+        }
+
         .status-badge { 
             display: inline-block; 
             padding: 4px 12px; 
@@ -77,13 +91,17 @@
 <div class="card">
     <div id="setup">
         <h2 style="margin-bottom:5px;">BPM Mic Pro</h2>
-        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:15px;">ノイズ除去 ＆ スムーズ表示</p>
+        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:15px;">MAX180 / 倍テンポ同時表示</p>
         <button id="startBtn">🎤 測定を開始</button>
     </div>
 
     <div id="ui" style="display:none">
         <div id="status" class="status-badge">READY</div>
-        <div class="bpm-display" id="bpm">--.-</div>
+        
+        <div class="bpm-container">
+            <div class="bpm-display" id="bpm">--.-</div>
+            <div class="bpm-double" id="bpmDouble">x2: --.-</div>
+        </div>
         
         <div class="controls">
             <div class="slider-label-row">
@@ -116,8 +134,6 @@
     let historySec = 4;
     let energyLog = [];
     let lastUpdate = 0;
-    
-    // 【新機能】表示用のBPMを記憶して滑らかに動かす変数
     let currentDisplayBPM = 0;
 
     const startBtn = document.getElementById('startBtn');
@@ -195,7 +211,6 @@
         let energy = 0;
         for(let i=1; i<6; i++) energy += dataArray[i];
 
-        // 【新機能】高周波ノイズを取り除くローパスフィルター
         if (energyLog.length > 0) {
             energy = (energyLog[energyLog.length - 1] * 0.4) + (energy * 0.6);
         }
@@ -237,17 +252,16 @@
 
         let correlations = [];
         
-        // 60〜200BPMのすべての相関を計算して配列に保存
-        for (let bpm = 60; bpm <= 200; bpm++) {
+        // 【変更】探索範囲を 60〜180 BPM に変更
+        for (let bpm = 60; bpm <= 180; bpm++) {
             correlations[bpm] = getCorrelation(normalized, bpm);
         }
 
         let coarseBPM = 0;
         let maxPeakCorr = -Infinity;
 
-        // 【新機能】200BPM張り付き防止（ピークピッキング）
-        // 単なる最大値ではなく、「前後のBPMより相関が高い（＝山の頂上）」箇所だけを探す
-        for (let bpm = 61; bpm <= 199; bpm++) {
+        // 【変更】ピークピッキングも上限を 179 BPM に制限
+        for (let bpm = 61; bpm <= 179; bpm++) {
             if (correlations[bpm] > correlations[bpm - 1] && correlations[bpm] > correlations[bpm + 1]) {
                 if (correlations[bpm] > maxPeakCorr) {
                     maxPeakCorr = correlations[bpm];
@@ -256,10 +270,8 @@
             }
         }
 
-        // 明確なビート（山の頂上）が見つからなかった場合は更新をスキップ
         if (coarseBPM === 0) return;
 
-        // 見つかった頂上の付近を0.1刻みで精密探索
         let bestBPM = coarseBPM;
         let maxCorr = -Infinity;
 
@@ -271,16 +283,17 @@
             }
         }
 
-        // 【新機能】BPM表示の滑らかなアニメーション（EMAフィルター）
+        // EMAフィルター（滑らか処理）
         if (currentDisplayBPM === 0 || Math.abs(currentDisplayBPM - bestBPM) > 15) {
-            // 最初、または曲が変わってBPMが大きく(15以上)飛んだ時は一瞬で切り替える
             currentDisplayBPM = bestBPM;
         } else {
-            // 少しの揺れは、現在の値(80%)と新しい値(20%)を混ぜて滑らかに遷移させる
             currentDisplayBPM = (currentDisplayBPM * 0.8) + (bestBPM * 0.2);
         }
 
+        // 画面の更新（メインBPM と 倍テンポBPM）
         document.getElementById('bpm').textContent = currentDisplayBPM.toFixed(1);
+        document.getElementById('bpmDouble').textContent = "x2: " + (currentDisplayBPM * 2).toFixed(1);
+        
         document.getElementById('status').textContent = "LOCKED";
         document.getElementById('status').style.color = "#10b981";
     }
