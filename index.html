@@ -30,6 +30,10 @@
         
         .bpm-container {
             margin: 5px 0 15px 0;
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #334155;
         }
         
         .bpm-display { 
@@ -41,23 +45,25 @@
             line-height: 1;
         }
         
-        /* 新機能：倍テンポ表示のデザイン */
+        /* 確実に追加されたと分かるように、黄色で少し大きめに設定 */
         .bpm-double {
-            font-size: 1.2rem;
-            color: #94a3b8;
+            font-size: 1.5rem;
+            color: #fbbf24;
             font-weight: bold;
-            margin-top: 5px;
+            margin-top: 8px;
             font-variant-numeric: tabular-nums;
+            text-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
         }
 
         .status-badge { 
             display: inline-block; 
             padding: 4px 12px; 
-            background: #0f172a; 
+            background: #1e293b; 
             border-radius: 20px; 
             font-size: 0.75rem; 
             color: #94a3b8; 
             border: 1px solid #475569;
+            margin-bottom: 5px;
         }
         
         canvas { 
@@ -252,16 +258,16 @@
 
         let correlations = [];
         
-        // 【変更】探索範囲を 60〜180 BPM に変更
-        for (let bpm = 60; bpm <= 180; bpm++) {
+        // 180ピッタリのピークを検知するために、計算自体は182まで行う
+        for (let bpm = 60; bpm <= 182; bpm++) {
             correlations[bpm] = getCorrelation(normalized, bpm);
         }
 
         let coarseBPM = 0;
         let maxPeakCorr = -Infinity;
 
-        // 【変更】ピークピッキングも上限を 179 BPM に制限
-        for (let bpm = 61; bpm <= 179; bpm++) {
+        // 表示の最大値を 180 BPM に制限
+        for (let bpm = 61; bpm <= 180; bpm++) {
             if (correlations[bpm] > correlations[bpm - 1] && correlations[bpm] > correlations[bpm + 1]) {
                 if (correlations[bpm] > maxPeakCorr) {
                     maxPeakCorr = correlations[bpm];
@@ -283,14 +289,13 @@
             }
         }
 
-        // EMAフィルター（滑らか処理）
         if (currentDisplayBPM === 0 || Math.abs(currentDisplayBPM - bestBPM) > 15) {
             currentDisplayBPM = bestBPM;
         } else {
             currentDisplayBPM = (currentDisplayBPM * 0.8) + (bestBPM * 0.2);
         }
 
-        // 画面の更新（メインBPM と 倍テンポBPM）
+        // ここでメインと倍テンポ(x2)を描画しています！
         document.getElementById('bpm').textContent = currentDisplayBPM.toFixed(1);
         document.getElementById('bpmDouble').textContent = "x2: " + (currentDisplayBPM * 2).toFixed(1);
         
