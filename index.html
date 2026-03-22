@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPM Analyzer Pro Fast</title>
+    <title>BPM Analyzer Pro Ultra Smooth</title>
     <style>
         body { 
             background: #020617; 
@@ -77,7 +77,7 @@
 <div class="card">
     <div id="setup">
         <h2 style="margin-bottom:5px;">BPM Mic Pro</h2>
-        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:15px;">高速レスポンス ＆ 4バンドVis</p>
+        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:15px;">ノイズ除去 ＆ スムーズ表示</p>
         <button id="startBtn">🎤 測定を開始</button>
     </div>
 
@@ -116,6 +116,9 @@
     let historySec = 4;
     let energyLog = [];
     let lastUpdate = 0;
+    
+    // 【新機能】表示用のBPMを記憶して滑らかに動かす変数
+    let currentDisplayBPM = 0;
 
     const startBtn = document.getElementById('startBtn');
     const bufferSlider = document.getElementById('bufferSlider');
@@ -179,9 +182,7 @@
     bufferSlider.oninput = (e) => {
         historySec = parseInt(e.target.value);
         document.getElementById('bufferLabel').textContent = historySec + "s";
-        
         const maxLen = SAMPLE_FREQ * historySec;
-        // バッファを全消しせず、あふれた古いデータだけ捨てる（計算が途切れないようにする）
         if (energyLog.length > maxLen) {
             energyLog = energyLog.slice(energyLog.length - maxLen);
         }
@@ -193,6 +194,12 @@
 
         let energy = 0;
         for(let i=1; i<6; i++) energy += dataArray[i];
+
+        // 【新機能】高周波ノイズを取り除くローパスフィルター
+        if (energyLog.length > 0) {
+            energy = (energyLog[energyLog.length - 1] * 0.4) + (energy * 0.6);
+        }
+        
         energyLog.push(energy);
 
         const maxLen = SAMPLE_FREQ * historySec;
@@ -200,9 +207,6 @@
 
         document.getElementById('progressBar').style.width = (energyLog.length / maxLen * 100) + "%";
 
-        // 【改善ポイント】
-        // 1. 最低2秒分のデータがあれば、バッファが満杯でなくても見切り発車でBPMを計算する
-        // 2. 更新頻度を 500ms(0.5秒) → 200ms(0.2秒) に短縮してサクサク動かす
         const minRequiredLen = SAMPLE_FREQ * 2; 
         if (energyLog.length >= minRequiredLen && Date.now() - lastUpdate > 200) {
             calcBPM();
@@ -231,19 +235,33 @@
         const mean = energyLog.reduce((a, b) => a + b, 0) / energyLog.length;
         const normalized = energyLog.map(v => v - mean);
 
-        let coarseBPM = 0;
-        let maxCorr = -Infinity;
-
+        let correlations = [];
+        
+        // 60〜200BPMのすべての相関を計算して配列に保存
         for (let bpm = 60; bpm <= 200; bpm++) {
-            let corr = getCorrelation(normalized, bpm);
-            if (corr > maxCorr) {
-                maxCorr = corr;
-                coarseBPM = bpm;
+            correlations[bpm] = getCorrelation(normalized, bpm);
+        }
+
+        let coarseBPM = 0;
+        let maxPeakCorr = -Infinity;
+
+        // 【新機能】200BPM張り付き防止（ピークピッキング）
+        // 単なる最大値ではなく、「前後のBPMより相関が高い（＝山の頂上）」箇所だけを探す
+        for (let bpm = 61; bpm <= 199; bpm++) {
+            if (correlations[bpm] > correlations[bpm - 1] && correlations[bpm] > correlations[bpm + 1]) {
+                if (correlations[bpm] > maxPeakCorr) {
+                    maxPeakCorr = correlations[bpm];
+                    coarseBPM = bpm;
+                }
             }
         }
 
+        // 明確なビート（山の頂上）が見つからなかった場合は更新をスキップ
+        if (coarseBPM === 0) return;
+
+        // 見つかった頂上の付近を0.1刻みで精密探索
         let bestBPM = coarseBPM;
-        maxCorr = -Infinity;
+        let maxCorr = -Infinity;
 
         for (let bpm = coarseBPM - 1; bpm <= coarseBPM + 1; bpm += 0.1) {
             let corr = getCorrelation(normalized, bpm);
@@ -253,7 +271,16 @@
             }
         }
 
-        document.getElementById('bpm').textContent = bestBPM.toFixed(1);
+        // 【新機能】BPM表示の滑らかなアニメーション（EMAフィルター）
+        if (currentDisplayBPM === 0 || Math.abs(currentDisplayBPM - bestBPM) > 15) {
+            // 最初、または曲が変わってBPMが大きく(15以上)飛んだ時は一瞬で切り替える
+            currentDisplayBPM = bestBPM;
+        } else {
+            // 少しの揺れは、現在の値(80%)と新しい値(20%)を混ぜて滑らかに遷移させる
+            currentDisplayBPM = (currentDisplayBPM * 0.8) + (bestBPM * 0.2);
+        }
+
+        document.getElementById('bpm').textContent = currentDisplayBPM.toFixed(1);
         document.getElementById('status').textContent = "LOCKED";
         document.getElementById('status').style.color = "#10b981";
     }
