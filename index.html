@@ -3,93 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPM Analyzer Pro Extreme Precision</title>
+    <title>BPM Analyzer Pro Mastercut</title>
     <style>
-        body { 
-            background: #020617; 
-            color: #f8fafc; 
-            font-family: sans-serif; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            min-height: 100vh; 
-            margin: 0;
-            padding: 20px;
-        }
-        .card { 
-            background: #1e293b; 
-            padding: 1.5rem; 
-            border-radius: 1.5rem; 
-            text-align: center; 
-            width: 100%; 
-            max-width: 380px; 
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
-            border: 1px solid #334155; 
-        }
-        
-        .bpm-container {
-            margin: 5px 0 15px 0;
-            background: #0f172a;
-            padding: 15px;
-            border-radius: 12px;
-            border: 1px solid #334155;
-            position: relative;
-        }
-        
-        .bpm-display { 
-            font-size: 70px; 
-            font-weight: 900; 
-            color: #10b981; 
-            text-shadow: 0 0 20px rgba(16, 185, 129, 0.4); 
-            font-variant-numeric: tabular-nums;
-            line-height: 1;
-        }
-        
-        .bpm-double {
-            font-size: 1.5rem;
-            color: #fbbf24;
-            font-weight: bold;
-            margin-top: 8px;
-            font-variant-numeric: tabular-nums;
-            text-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
-        }
-
-        .status-badge { 
-            display: inline-block; 
-            padding: 4px 12px; 
-            background: #7f1d1d; /* 高負荷モードを示す赤色系 */
-            border-radius: 20px; 
-            font-size: 0.75rem; 
-            color: #fca5a5; 
-            border: 1px solid #b91c1c;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        
-        canvas { 
-            width: 100%; 
-            background: #0f172a; 
-            border-radius: 8px; 
-            border: 1px solid #334155;
-            display: block; 
-        }
-        
+        body { background: #020617; color: #f8fafc; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .card { background: #1e293b; padding: 1.5rem; border-radius: 1.5rem; text-align: center; width: 100%; max-width: 380px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid #334155; }
+        .bpm-container { margin: 5px 0 15px 0; background: #0f172a; padding: 15px; border-radius: 12px; border: 1px solid #334155; position: relative; }
+        .bpm-display { font-size: 70px; font-weight: 900; color: #10b981; text-shadow: 0 0 20px rgba(16, 185, 129, 0.4); font-variant-numeric: tabular-nums; line-height: 1; }
+        .bpm-double { font-size: 1.5rem; color: #fbbf24; font-weight: bold; margin-top: 8px; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(251, 191, 36, 0.3); }
+        .status-badge { display: inline-block; padding: 4px 12px; background: #4c1d95; border-radius: 20px; font-size: 0.75rem; color: #c4b5fd; border: 1px solid #7c3aed; margin-bottom: 5px; font-weight: bold; }
+        canvas { width: 100%; background: #0f172a; border-radius: 8px; border: 1px solid #334155; display: block; }
         #canvas { height: 60px; margin-bottom: 5px; }
         #visualizer { height: 70px; margin-bottom: 10px; }
-
         .progress-container { width: 100%; height: 6px; background: #0f172a; border-radius: 3px; margin-bottom: 10px; overflow: hidden; }
-        #progressBar { width: 0%; height: 100%; background: #38bdf8; transition: 0.1s; }
-
+        #progressBar { width: 0%; height: 100%; background: #a855f7; transition: 0.1s; }
         .controls { background: #0f172a; padding: 10px; border-radius: 8px; margin-bottom: 8px; text-align: left; }
-        input[type=range] { width: 100%; height: 25px; accent-color: #38bdf8; margin: 0; }
+        input[type=range] { width: 100%; height: 25px; accent-color: #a855f7; margin: 0; }
         .slider-label-row { display:flex; justify-content:space-between; font-size:0.75rem; color:#94a3b8; margin-bottom:3px; }
-
-        button { 
-            background: #10b981; color: white; border: none; padding: 16px; 
-            border-radius: 12px; font-weight: bold; width: 100%; font-size: 1.1rem;
-            cursor: pointer;
-        }
+        button { background: #a855f7; color: white; border: none; padding: 16px; border-radius: 12px; font-weight: bold; width: 100%; font-size: 1.1rem; cursor: pointer; }
         #resetBtn { background: #475569; margin-top: 5px; padding: 10px; font-size: 0.9rem; }
     </style>
 </head>
@@ -97,13 +27,13 @@
 
 <div class="card">
     <div id="setup">
-        <h2 style="margin-bottom:5px;">BPM Mic Extreme</h2>
-        <p style="color:#f43f5e; font-size:0.8rem; margin-bottom:15px;">最高精度モード (処理負荷 大)</p>
+        <h2 style="margin-bottom:5px;">BPM Mic Master</h2>
+        <p style="color:#c4b5fd; font-size:0.8rem; margin-bottom:15px;">トランジェント検出エンジン搭載</p>
         <button id="startBtn">🎤 測定を開始</button>
     </div>
 
     <div id="ui" style="display:none">
-        <div id="status" class="status-badge">EXTREME PRECISION</div>
+        <div id="status" class="status-badge">ONSET DETECTION</div>
         
         <div class="bpm-container">
             <div class="bpm-display" id="bpm">--.-</div>
@@ -137,11 +67,13 @@
 
 <script>
     let audioCtx, analyser, dataArray, gainNode;
-    // 【精度UP】 サンプリング周波数を100Hzから200Hz(5ms間隔)に倍増
     const SAMPLE_FREQ = 200; 
     let historySec = 4;
     let energyLog = [];
     let lastUpdate = 0;
+    
+    // 【新アルゴリズム用変数】 直前の音量を記憶
+    let prevEnergy = 0;
     
     let currentDisplayBPM = 0;
     let bpmHistory = []; 
@@ -186,7 +118,6 @@
             gainNode.gain.value = parseFloat(volumeSlider.value);
 
             analyser = audioCtx.createAnalyser();
-            // 【精度UP】 FFTサイズを512から2048に拡大（周波数解像度が4倍に）
             analyser.fftSize = 2048; 
             
             source.connect(gainNode);
@@ -221,16 +152,22 @@
         if (!analyser) return;
         analyser.getByteFrequencyData(dataArray);
 
-        let energy = 0;
-        // 【精度UP】 FFT 2048におけるビン2〜6 (約46Hz〜140Hz) 
-        // キックドラムの芯の帯域だけをピンポイントで狙い撃ちする
-        for(let i=2; i<=6; i++) energy += dataArray[i];
+        // キックとスネアの帯域 (約46Hz〜350Hz) をカバーするよう範囲を拡張
+        let rawEnergy = 0;
+        for(let i=2; i<=15; i++) rawEnergy += dataArray[i];
 
-        if (energyLog.length > 0) {
-            energy = (energyLog[energyLog.length - 1] * 0.4) + (energy * 0.6);
-        }
+        // 【新アルゴリズム】 トランジェント（Onset）抽出
+        // 直前のフレームから「どれだけ音が大きくなったか（変化量）」だけを取得する
+        let flux = rawEnergy - prevEnergy;
+        prevEnergy = rawEnergy;
         
-        energyLog.push(energy);
+        // 音が減衰している時（マイナス）はゼロにする（アタックだけを残す）
+        flux = Math.max(0, flux);
+        
+        // アタックをさらに強調するために値をべき乗する（小さなノイズを潰し、強いビートを際立たせる）
+        flux = Math.pow(flux, 1.5);
+        
+        energyLog.push(flux);
 
         const maxLen = SAMPLE_FREQ * historySec;
         if (energyLog.length > maxLen) energyLog.shift();
@@ -260,11 +197,11 @@
     }
 
     function calcBPM() {
+        // トランジェント抽出された鋭いスパイクに対して自己相関を行う
         const mean = energyLog.reduce((a, b) => a + b, 0) / energyLog.length;
         const normalized = energyLog.map(v => v - mean);
 
         let correlations = [];
-        
         for (let bpm = 60; bpm <= 182; bpm++) {
             correlations[bpm] = getCorrelation(normalized, bpm);
         }
@@ -286,7 +223,6 @@
         let bestBPM = coarseBPM;
         let maxCorr = -Infinity;
 
-        // 【精度UP】 0.1刻みから 0.05刻みへ。より細かく頂点を探る
         for (let bpm = coarseBPM - 1; bpm <= coarseBPM + 1; bpm += 0.05) {
             let corr = getCorrelation(normalized, bpm);
             if (corr > maxCorr) {
@@ -316,8 +252,8 @@
         document.getElementById('bpmDouble').textContent = "x2: " + (currentDisplayBPM * 2).toFixed(1);
         
         document.getElementById('status').textContent = "LOCKED";
-        document.getElementById('status').style.color = "#10b981";
-        document.getElementById('status').style.borderColor = "#10b981";
+        document.getElementById('status').style.color = "#a855f7";
+        document.getElementById('status').style.borderColor = "#a855f7";
     }
 
     function fillRoundedRect(ctx, x, y, width, height, radius) {
@@ -344,13 +280,18 @@
 
         ctxWave.clearRect(0, 0, waveCanvasLogical.width, waveCanvasLogical.height);
         ctxWave.beginPath();
-        ctxWave.strokeStyle = "#f43f5e"; // 高精度モード用の波形カラー(ローズレッド)
+        ctxWave.strokeStyle = "#a855f7"; // パープル系に変更
         ctxWave.lineWidth = 1.5;
 
         const maxLen = SAMPLE_FREQ * historySec;
         const waveStep = waveCanvasLogical.width / maxLen;
+        
+        // 描画の最適化: 最大値で正規化して画面からはみ出さないようにする
+        const maxDrawEnergy = Math.max(...energyLog, 1);
+        
         for (let i = 0; i < energyLog.length; i++) {
-            let y = waveCanvasLogical.height - (energyLog[i] / 1000 * waveCanvasLogical.height);
+            // アタック成分（スパイク）を綺麗に表示
+            let y = waveCanvasLogical.height - (energyLog[i] / maxDrawEnergy * waveCanvasLogical.height * 0.9);
             y = Math.max(0, Math.min(waveCanvasLogical.height, y));
             
             if (i === 0) ctxWave.moveTo(0, y);
@@ -361,12 +302,11 @@
         analyser.getByteFrequencyData(dataArray); 
         ctxVis.clearRect(0, 0, visCanvasLogical.width, visCanvasLogical.height);
 
-        // 【精度UP】 FFT 2048(1024ビン)に合わせた4バンドの再定義
         const ranges = [
-            { start: 1, end: 10 },   // Bass: ~230Hz
-            { start: 11, end: 85 },  // Low Mid: ~2kHz
-            { start: 86, end: 340 }, // High Mid: ~8kHz
-            { start: 341, end: 800 } // Highs: ~20kHz
+            { start: 1, end: 10 },   
+            { start: 11, end: 85 },  
+            { start: 86, end: 340 }, 
+            { start: 341, end: 800 } 
         ];
 
         const numBands = ranges.length;
