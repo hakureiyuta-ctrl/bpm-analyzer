@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPM Analyzer Pro Ultra Stable</title>
+    <title>BPM Analyzer Pro Ultra Stable 1sec</title>
     <style>
         body { 
             background: #020617; 
@@ -97,7 +97,7 @@
 <div class="card">
     <div id="setup">
         <h2 style="margin-bottom:5px;">BPM Mic Pro</h2>
-        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:15px;">超安定ロック ＆ 倍テンポ表示</p>
+        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:15px;">1秒更新 ＆ 超安定ロック</p>
         <button id="startBtn">🎤 測定を開始</button>
     </div>
 
@@ -143,8 +143,9 @@
     
     // 【安定化用変数】
     let currentDisplayBPM = 0;
-    let bpmHistory = []; // 直近の解析結果を保存する配列
-    const BPM_HISTORY_SIZE = 7; // 中央値を取るためのサンプル数
+    let bpmHistory = []; 
+    // 1秒更新に合わせて、履歴サイズを7から3に短縮（3秒で中央値を取る）
+    const BPM_HISTORY_SIZE = 3; 
 
     const startBtn = document.getElementById('startBtn');
     const bufferSlider = document.getElementById('bufferSlider');
@@ -212,7 +213,7 @@
         if (energyLog.length > maxLen) {
             energyLog = energyLog.slice(energyLog.length - maxLen);
         }
-        bpmHistory = []; // バッファ変更時は履歴もリセット
+        bpmHistory = []; 
     };
 
     function analyze() {
@@ -234,7 +235,9 @@
         document.getElementById('progressBar').style.width = (energyLog.length / maxLen * 100) + "%";
 
         const minRequiredLen = SAMPLE_FREQ * 2; 
-        if (energyLog.length >= minRequiredLen && Date.now() - lastUpdate > 200) {
+        
+        // 【変更点】 200ms -> 1000ms (1秒) に変更
+        if (energyLog.length >= minRequiredLen && Date.now() - lastUpdate > 1000) {
             calcBPM();
             lastUpdate = Date.now();
         } else if (energyLog.length < minRequiredLen) {
@@ -292,8 +295,6 @@
             }
         }
 
-        // --- 【安定化ロジック1: メディアンフィルター】 ---
-        // 直近数回の結果を貯め、その真ん中の値（中央値）を採用することで外れ値を排除
         bpmHistory.push(bestBPM);
         if (bpmHistory.length > BPM_HISTORY_SIZE) {
             bpmHistory.shift();
@@ -302,16 +303,12 @@
         let medianBPM = sortedHistory[Math.floor(sortedHistory.length / 2)];
 
 
-        // --- 【安定化ロジック2: デッドゾーン ＆ EMA】 ---
         if (currentDisplayBPM === 0 || Math.abs(currentDisplayBPM - medianBPM) > 15) {
-            // 最初、または曲が変わってBPMが大きく飛んだ時は即座に反映
             currentDisplayBPM = medianBPM;
         } else {
-            // 変化量が 0.3 未満の微細な揺れなら数値を固定して揺らさない（デッドゾーン）
             if (Math.abs(currentDisplayBPM - medianBPM) < 0.3) {
                 // currentDisplayBPM をそのまま維持
             } else {
-                // それ以上の変化なら、より重いEMA（85%維持）でゆっくり追従させる
                 currentDisplayBPM = (currentDisplayBPM * 0.85) + (medianBPM * 0.15);
             }
         }
