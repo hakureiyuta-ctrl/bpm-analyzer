@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPM Analyzer Mini</title>
+    <title>BPM Analyzer Pro</title>
     <style>
         body { 
             background: #020617; 
@@ -28,11 +28,13 @@
             border: 1px solid #334155; 
         }
         .bpm-display { 
-            font-size: 80px; 
+            /* 小数点が表示されるため、少しだけ文字サイズを調整 */
+            font-size: 70px; 
             font-weight: 900; 
             color: #10b981; 
             margin: 10px 0; 
             text-shadow: 0 0 20px rgba(16, 185, 129, 0.4); 
+            font-variant-numeric: tabular-nums;
         }
         .status-badge { 
             display: inline-block; 
@@ -62,14 +64,14 @@
 
 <div class="card">
     <div id="setup">
-        <h2 style="margin-bottom:10px;">BPM Mic</h2>
-        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:20px;">マイクで周囲のテンポを測定します</p>
+        <h2 style="margin-bottom:10px;">BPM Mic Pro</h2>
+        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:20px;">0.1単位の超精密解析モード</p>
         <button id="startBtn">🎤 測定を開始</button>
     </div>
 
     <div id="ui" style="display:none">
         <div id="status" class="status-badge">READY</div>
-        <div class="bpm-display" id="bpm">--</div>
+        <div class="bpm-display" id="bpm">--.-</div>
         
         <div class="controls">
             <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#94a3b8; margin-bottom:5px;">
@@ -117,14 +119,12 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             const source = audioCtx.createMediaStreamSource(stream);
             
-            // GainNode（音量調整）の作成と設定
             gainNode = audioCtx.createGain();
             gainNode.gain.value = parseFloat(volumeSlider.value);
 
             analyser = audioCtx.createAnalyser();
             analyser.fftSize = 512;
             
-            // 接続: マイク -> 音量調整 -> アナライザー
             source.connect(gainNode);
             gainNode.connect(analyser);
 
@@ -137,28 +137,22 @@
         }
     };
 
-    // 音量スライダーのイベント
     volumeSlider.oninput = (e) => {
         const val = parseFloat(e.target.value);
         document.getElementById('volumeLabel').textContent = "x" + val.toFixed(1);
-        if (gainNode) {
-            // スライダーの値に合わせて即座にマイク入力の音量を変更
-            gainNode.gain.value = val;
-        }
+        if (gainNode) gainNode.gain.value = val;
     };
 
-    // バッファスライダーのイベント
     bufferSlider.oninput = (e) => {
         historySec = parseInt(e.target.value);
         document.getElementById('bufferLabel').textContent = historySec + "s";
-        energyLog = []; // バッファサイズ変更時はリセット
+        energyLog = []; 
     };
 
     function analyze() {
         if (!analyser) return;
         analyser.getByteFrequencyData(dataArray);
 
-        // 低周波領域（1~5番目のビン）の合計をエネルギーとする
         let energy = 0;
         for(let i=1; i<6; i++) energy += dataArray[i];
         energyLog.push(energy);
@@ -166,43 +160,60 @@
         const maxLen = SAMPLE_FREQ * historySec;
         if (energyLog.length > maxLen) energyLog.shift();
 
-        // 進捗バー
         document.getElementById('progressBar').style.width = (energyLog.length / maxLen * 100) + "%";
 
-        // バッファが溜まったら0.5秒おきにBPM計算
         if (energyLog.length >= maxLen && Date.now() - lastUpdate > 500) {
             calcBPM();
             lastUpdate = Date.now();
         }
     }
 
+    // 相関を計算するヘルパー関数
+    function getCorrelation(normalized, bpm) {
+        let step = (60 / bpm) * SAMPLE_FREQ;
+        let corr = 0;
+        let count = 0;
+        for (let i = 0; i < normalized.length - Math.ceil(step); i++) {
+            let j = i + step;
+            let i1 = Math.floor(j), i2 = Math.ceil(j), frac = j - i1;
+            let val = normalized[i1] * (1 - frac) + normalized[i2] * frac;
+            corr += normalized[i] * val;
+            count++;
+        }
+        return corr / count;
+    }
+
     function calcBPM() {
         const mean = energyLog.reduce((a, b) => a + b, 0) / energyLog.length;
         const normalized = energyLog.map(v => v - mean);
 
-        let bestBPM = 0;
+        // --- 1段階目: 粗い探索 (整数刻み) ---
+        let coarseBPM = 0;
         let maxCorr = -Infinity;
 
-        // 60-200 BPMの範囲で自己相関
         for (let bpm = 60; bpm <= 200; bpm++) {
-            let step = (60 / bpm) * SAMPLE_FREQ;
-            let corr = 0;
-            let count = 0;
-
-            for (let i = 0; i < normalized.length - Math.ceil(step); i++) {
-                let j = i + step;
-                let i1 = Math.floor(j), i2 = Math.ceil(j), frac = j - i1;
-                let val = normalized[i1] * (1 - frac) + normalized[i2] * frac;
-                corr += normalized[i] * val;
-                count++;
+            let corr = getCorrelation(normalized, bpm);
+            if (corr > maxCorr) {
+                maxCorr = corr;
+                coarseBPM = bpm;
             }
-            
-            if (corr / count > maxCorr) {
-                maxCorr = corr / count;
+        }
+
+        // --- 2段階目: 精密探索 (0.1刻み) ---
+        // 見つけた粗いBPMの前後1の範囲（例：120なら、119.0〜121.0）を0.1刻みで探す
+        let bestBPM = coarseBPM;
+        maxCorr = -Infinity;
+
+        for (let bpm = coarseBPM - 1; bpm <= coarseBPM + 1; bpm += 0.1) {
+            let corr = getCorrelation(normalized, bpm);
+            if (corr > maxCorr) {
+                maxCorr = corr;
                 bestBPM = bpm;
             }
         }
-        document.getElementById('bpm').textContent = bestBPM;
+
+        // 画面には小数点第1位まで表示 (例: 128.0)
+        document.getElementById('bpm').textContent = bestBPM.toFixed(1);
         document.getElementById('status').textContent = "LOCKED";
         document.getElementById('status').style.color = "#10b981";
     }
@@ -221,7 +232,6 @@
         const step = canvas.width / (SAMPLE_FREQ * historySec);
         for (let i = 0; i < energyLog.length; i++) {
             let y = canvas.height - (energyLog[i] / 1000 * canvas.height);
-            // キャンバスからはみ出ないように制限
             y = Math.max(0, Math.min(canvas.height, y));
             
             if (i === 0) ctx.moveTo(0, y);
