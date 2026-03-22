@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPM Analyzer Pro Ultra Stable 1sec</title>
+    <title>BPM Analyzer Pro Extreme Precision</title>
     <style>
         body { 
             background: #020617; 
@@ -58,12 +58,13 @@
         .status-badge { 
             display: inline-block; 
             padding: 4px 12px; 
-            background: #1e293b; 
+            background: #7f1d1d; /* 高負荷モードを示す赤色系 */
             border-radius: 20px; 
             font-size: 0.75rem; 
-            color: #94a3b8; 
-            border: 1px solid #475569;
+            color: #fca5a5; 
+            border: 1px solid #b91c1c;
             margin-bottom: 5px;
+            font-weight: bold;
         }
         
         canvas { 
@@ -96,13 +97,13 @@
 
 <div class="card">
     <div id="setup">
-        <h2 style="margin-bottom:5px;">BPM Mic Pro</h2>
-        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:15px;">1秒更新 ＆ 超安定ロック</p>
+        <h2 style="margin-bottom:5px;">BPM Mic Extreme</h2>
+        <p style="color:#f43f5e; font-size:0.8rem; margin-bottom:15px;">最高精度モード (処理負荷 大)</p>
         <button id="startBtn">🎤 測定を開始</button>
     </div>
 
     <div id="ui" style="display:none">
-        <div id="status" class="status-badge">READY</div>
+        <div id="status" class="status-badge">EXTREME PRECISION</div>
         
         <div class="bpm-container">
             <div class="bpm-display" id="bpm">--.-</div>
@@ -136,15 +137,14 @@
 
 <script>
     let audioCtx, analyser, dataArray, gainNode;
-    const SAMPLE_FREQ = 100; 
+    // 【精度UP】 サンプリング周波数を100Hzから200Hz(5ms間隔)に倍増
+    const SAMPLE_FREQ = 200; 
     let historySec = 4;
     let energyLog = [];
     let lastUpdate = 0;
     
-    // 【安定化用変数】
     let currentDisplayBPM = 0;
     let bpmHistory = []; 
-    // 1秒更新に合わせて、履歴サイズを7から3に短縮（3秒で中央値を取る）
     const BPM_HISTORY_SIZE = 3; 
 
     const startBtn = document.getElementById('startBtn');
@@ -186,7 +186,8 @@
             gainNode.gain.value = parseFloat(volumeSlider.value);
 
             analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 512; 
+            // 【精度UP】 FFTサイズを512から2048に拡大（周波数解像度が4倍に）
+            analyser.fftSize = 2048; 
             
             source.connect(gainNode);
             gainNode.connect(analyser);
@@ -221,7 +222,9 @@
         analyser.getByteFrequencyData(dataArray);
 
         let energy = 0;
-        for(let i=1; i<6; i++) energy += dataArray[i];
+        // 【精度UP】 FFT 2048におけるビン2〜6 (約46Hz〜140Hz) 
+        // キックドラムの芯の帯域だけをピンポイントで狙い撃ちする
+        for(let i=2; i<=6; i++) energy += dataArray[i];
 
         if (energyLog.length > 0) {
             energy = (energyLog[energyLog.length - 1] * 0.4) + (energy * 0.6);
@@ -236,13 +239,9 @@
 
         const minRequiredLen = SAMPLE_FREQ * 2; 
         
-        // 【変更点】 200ms -> 1000ms (1秒) に変更
         if (energyLog.length >= minRequiredLen && Date.now() - lastUpdate > 1000) {
             calcBPM();
             lastUpdate = Date.now();
-        } else if (energyLog.length < minRequiredLen) {
-            document.getElementById('status').textContent = "集音中...";
-            document.getElementById('status').style.color = "#94a3b8";
         }
     }
 
@@ -287,7 +286,8 @@
         let bestBPM = coarseBPM;
         let maxCorr = -Infinity;
 
-        for (let bpm = coarseBPM - 1; bpm <= coarseBPM + 1; bpm += 0.1) {
+        // 【精度UP】 0.1刻みから 0.05刻みへ。より細かく頂点を探る
+        for (let bpm = coarseBPM - 1; bpm <= coarseBPM + 1; bpm += 0.05) {
             let corr = getCorrelation(normalized, bpm);
             if (corr > maxCorr) {
                 maxCorr = corr;
@@ -302,12 +302,11 @@
         let sortedHistory = [...bpmHistory].sort((a, b) => a - b);
         let medianBPM = sortedHistory[Math.floor(sortedHistory.length / 2)];
 
-
         if (currentDisplayBPM === 0 || Math.abs(currentDisplayBPM - medianBPM) > 15) {
             currentDisplayBPM = medianBPM;
         } else {
             if (Math.abs(currentDisplayBPM - medianBPM) < 0.3) {
-                // currentDisplayBPM をそのまま維持
+                // デッドゾーン維持
             } else {
                 currentDisplayBPM = (currentDisplayBPM * 0.85) + (medianBPM * 0.15);
             }
@@ -318,6 +317,7 @@
         
         document.getElementById('status').textContent = "LOCKED";
         document.getElementById('status').style.color = "#10b981";
+        document.getElementById('status').style.borderColor = "#10b981";
     }
 
     function fillRoundedRect(ctx, x, y, width, height, radius) {
@@ -344,7 +344,7 @@
 
         ctxWave.clearRect(0, 0, waveCanvasLogical.width, waveCanvasLogical.height);
         ctxWave.beginPath();
-        ctxWave.strokeStyle = "#38bdf8"; 
+        ctxWave.strokeStyle = "#f43f5e"; // 高精度モード用の波形カラー(ローズレッド)
         ctxWave.lineWidth = 1.5;
 
         const maxLen = SAMPLE_FREQ * historySec;
@@ -361,11 +361,12 @@
         analyser.getByteFrequencyData(dataArray); 
         ctxVis.clearRect(0, 0, visCanvasLogical.width, visCanvasLogical.height);
 
+        // 【精度UP】 FFT 2048(1024ビン)に合わせた4バンドの再定義
         const ranges = [
-            { start: 0, end: 5 },   
-            { start: 6, end: 20 },  
-            { start: 21, end: 80 }, 
-            { start: 81, end: 150 } 
+            { start: 1, end: 10 },   // Bass: ~230Hz
+            { start: 11, end: 85 },  // Low Mid: ~2kHz
+            { start: 86, end: 340 }, // High Mid: ~8kHz
+            { start: 341, end: 800 } // Highs: ~20kHz
         ];
 
         const numBands = ranges.length;
