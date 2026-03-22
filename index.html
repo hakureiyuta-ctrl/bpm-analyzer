@@ -3,38 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPM Analyzer Pro OVERKILL</title>
+    <title>BPM Analyzer Pro QUANTUM</title>
     <style>
-        body { background: #000000; color: #f8fafc; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
-        /* 限界突破感を出すため、ブラック×ゴールド系のデザインに */
-        .card { background: #0a0a0a; padding: 1.5rem; border-radius: 1.5rem; text-align: center; width: 100%; max-width: 380px; box-shadow: 0 0 40px rgba(250, 204, 21, 0.15); border: 1px solid #3f3f46; }
-        .bpm-container { margin: 5px 0 15px 0; background: #18181b; padding: 15px; border-radius: 12px; border: 1px solid #3f3f46; position: relative; }
-        .bpm-display { font-size: 70px; font-weight: 900; color: #facc15; text-shadow: 0 0 20px rgba(250, 204, 21, 0.4); font-variant-numeric: tabular-nums; line-height: 1; }
-        .bpm-double { font-size: 1.5rem; color: #a1a1aa; font-weight: bold; margin-top: 8px; font-variant-numeric: tabular-nums; }
-        .status-badge { display: inline-block; padding: 4px 12px; background: #422006; border-radius: 20px; font-size: 0.75rem; color: #fef08a; border: 1px solid #854d0e; margin-bottom: 5px; font-weight: bold; letter-spacing: 1px; }
-        canvas { width: 100%; background: #18181b; border-radius: 8px; border: 1px solid #3f3f46; display: block; }
+        body { background: #020617; color: #f8fafc; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .card { background: #0f172a; padding: 1.5rem; border-radius: 1.5rem; text-align: center; width: 100%; max-width: 380px; box-shadow: 0 0 50px rgba(6, 182, 212, 0.2); border: 1px solid #1e293b; }
+        .bpm-container { margin: 5px 0 15px 0; background: #020617; padding: 15px; border-radius: 12px; border: 1px solid #1e293b; position: relative; box-shadow: inset 0 0 20px rgba(6, 182, 212, 0.05); }
+        
+        .bpm-display { font-size: 75px; font-weight: 900; color: #22d3ee; text-shadow: 0 0 25px rgba(34, 211, 238, 0.5); font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -2px; }
+        .bpm-double { font-size: 1.5rem; color: #a855f7; font-weight: bold; margin-top: 8px; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(168, 85, 247, 0.4); }
+        
+        .status-badge { display: inline-block; padding: 4px 15px; background: #083344; border-radius: 20px; font-size: 0.75rem; color: #67e8f9; border: 1px solid #0e7490; margin-bottom: 5px; font-weight: bold; letter-spacing: 2px; }
+        
+        canvas { width: 100%; background: #020617; border-radius: 8px; border: 1px solid #1e293b; display: block; }
         #canvas { height: 60px; margin-bottom: 5px; }
         #visualizer { height: 70px; margin-bottom: 10px; }
-        .progress-container { width: 100%; height: 6px; background: #27272a; border-radius: 3px; margin-bottom: 10px; overflow: hidden; }
-        #progressBar { width: 0%; height: 100%; background: #facc15; transition: 0.1s; }
-        .controls { background: #18181b; padding: 10px; border-radius: 8px; margin-bottom: 8px; text-align: left; }
-        input[type=range] { width: 100%; height: 25px; accent-color: #facc15; margin: 0; }
-        .slider-label-row { display:flex; justify-content:space-between; font-size:0.75rem; color:#a1a1aa; margin-bottom:3px; }
-        button { background: #facc15; color: #000000; border: none; padding: 16px; border-radius: 12px; font-weight: bold; width: 100%; font-size: 1.1rem; cursor: pointer; }
-        #resetBtn { background: #3f3f46; color: #ffffff; margin-top: 5px; padding: 10px; font-size: 0.9rem; }
+        
+        .progress-container { width: 100%; height: 4px; background: #1e293b; border-radius: 2px; margin-bottom: 15px; overflow: hidden; }
+        #progressBar { width: 0%; height: 100%; background: linear-gradient(90deg, #22d3ee, #a855f7); transition: 0.1s; }
+        
+        .controls { background: #020617; padding: 12px; border-radius: 8px; margin-bottom: 8px; text-align: left; border: 1px solid #1e293b; }
+        input[type=range] { width: 100%; height: 25px; accent-color: #22d3ee; margin: 0; }
+        .slider-label-row { display:flex; justify-content:space-between; font-size:0.75rem; color: #94a3b8; margin-bottom:5px; font-weight: bold; }
+        
+        button { background: linear-gradient(135deg, #06b6d4, #8b5cf6); color: #ffffff; border: none; padding: 16px; border-radius: 12px; font-weight: bold; width: 100%; font-size: 1.1rem; cursor: pointer; text-shadow: 0 2px 4px rgba(0,0,0,0.3); box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3); }
+        #resetBtn { background: transparent; color: #64748b; margin-top: 5px; padding: 10px; font-size: 0.8rem; box-shadow: none; border: 1px solid #334155; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <div id="setup">
-        <h2 style="margin-bottom:5px; color:#facc15;">BPM Mic OVERKILL</h2>
-        <p style="color:#a1a1aa; font-size:0.8rem; margin-bottom:15px;">全帯域スペクトラル解析 (高負荷)</p>
-        <button id="startBtn">🎤 限界精度で測定開始</button>
+        <h2 style="margin-bottom:5px; color:#22d3ee;">QUANTUM ENGINE</h2>
+        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:15px;">コムフィルター & 動的サンプリング補正</p>
+        <button id="startBtn">⚡ 究極精度で解析開始</button>
     </div>
 
     <div id="ui" style="display:none">
-        <div id="status" class="status-badge">SPECTRAL FLUX ENGINE</div>
+        <div id="status" class="status-badge">QUANTUM SYNC</div>
         
         <div class="bpm-container">
             <div class="bpm-display" id="bpm">--.-</div>
@@ -44,7 +49,7 @@
         <div class="controls">
             <div class="slider-label-row">
                 <span>🎙️ 入力音量 (Gain)</span>
-                <span id="volumeLabel">x1.0</span>
+                <span id="volumeLabel" style="color:#22d3ee;">x1.0</span>
             </div>
             <input type="range" id="volumeSlider" min="0.1" max="5.0" step="0.1" value="1.0">
         </div>
@@ -52,7 +57,7 @@
         <div class="controls">
             <div class="slider-label-row">
                 <span>⏱️ 解析バッファ</span>
-                <span id="bufferLabel">6s</span>
+                <span id="bufferLabel" style="color:#a855f7;">6s</span>
             </div>
             <input type="range" id="bufferSlider" min="4" max="12" step="1" value="6">
         </div>
@@ -69,14 +74,15 @@
 <script>
     let audioCtx, analyser, dataArray, gainNode;
     
-    // ブラウザのタイマーの限界値に近い 250Hz (4ms) サンプリング
-    const SAMPLE_FREQ = 250; 
-    let historySec = 6; // デフォルトを6秒に延長（精度向上のため）
-    let energyLog = [];
-    let lastUpdate = 0;
+    // 目標のサンプリング周波数 (5ms間隔)
+    const TARGET_SAMPLE_FREQ = 200; 
+    let historySec = 6; 
     
-    // 【極限精度用】 全ての周波数帯域の直前の音量を記憶する配列
-    let prevSpectrum = new Uint8Array(2048);
+    // 【究極精度】 データと「記録した正確な時間」をペアで保存する
+    let energyLog = [];
+    let timeLog = []; 
+    let prevSpectrum = new Uint8Array(4096);
+    let lastUpdate = 0;
     
     let currentDisplayBPM = 0;
     let bpmHistory = []; 
@@ -91,7 +97,7 @@
     const canvas = document.getElementById('canvas');
     const ctxWave = canvas.getContext('2d');
 
-    const bandColors = ['#ec4899', '#f59e0b', '#10b981', '#38bdf8'];
+    const bandColors = ['#ec4899', '#f59e0b', '#10b981', '#22d3ee'];
 
     function adjustCanvasResolution(c, ctx) {
         const dpr = window.devicePixelRatio || 1;
@@ -121,7 +127,6 @@
             gainNode.gain.value = parseFloat(volumeSlider.value);
 
             analyser = audioCtx.createAnalyser();
-            // 【極限精度】 FFTサイズを4096に倍増 (2048ビン)
             analyser.fftSize = 4096; 
             
             source.connect(gainNode);
@@ -130,7 +135,8 @@
             dataArray = new Uint8Array(analyser.frequencyBinCount);
             prevSpectrum = new Uint8Array(analyser.frequencyBinCount);
 
-            setInterval(analyze, 1000 / SAMPLE_FREQ);
+            // setIntervalのズレを許容し、実際の時間をtimeLogに記録する
+            setInterval(analyze, 1000 / TARGET_SAMPLE_FREQ);
             draw();
         } catch (err) {
             alert("マイクの使用が拒否されました。設定を確認してください。");
@@ -146,9 +152,12 @@
     bufferSlider.oninput = (e) => {
         historySec = parseInt(e.target.value);
         document.getElementById('bufferLabel').textContent = historySec + "s";
-        const maxLen = SAMPLE_FREQ * historySec;
+        
+        // バッファ変更時はデータを安全に切り詰める
+        const maxLen = TARGET_SAMPLE_FREQ * historySec;
         if (energyLog.length > maxLen) {
             energyLog = energyLog.slice(energyLog.length - maxLen);
+            timeLog = timeLog.slice(timeLog.length - maxLen);
         }
         bpmHistory = []; 
     };
@@ -157,30 +166,28 @@
         if (!analyser) return;
         analyser.getByteFrequencyData(dataArray);
 
-        // 【極限精度】 マルチバンド・スペクトラル・フラックス
-        // 低域〜中高域 (約20Hz〜4kHz) までの200個の帯域をすべて個別に比較
         let flux = 0;
-        for (let i = 2; i < 200; i++) {
+        for (let i = 2; i < 300; i++) {
             let diff = dataArray[i] - prevSpectrum[i];
-            // 音が大きくなった帯域のエネルギーだけを合算する
-            if (diff > 0) {
-                flux += diff;
-            }
-            // 今回のスペクトルを保存して次回に備える
+            if (diff > 0) flux += diff;
             prevSpectrum[i] = dataArray[i];
         }
 
-        // 小さなノイズを圧縮し、強いアタックを際立たせる
         flux = Math.pow(flux, 1.2);
         
+        // 【究極精度 1】 ブラウザのタイマーのズレを実時間(performance.now)で記録
         energyLog.push(flux);
+        timeLog.push(performance.now());
 
-        const maxLen = SAMPLE_FREQ * historySec;
-        if (energyLog.length > maxLen) energyLog.shift();
+        const maxLen = TARGET_SAMPLE_FREQ * historySec;
+        if (energyLog.length > maxLen) {
+            energyLog.shift();
+            timeLog.shift();
+        }
 
         document.getElementById('progressBar').style.width = (energyLog.length / maxLen * 100) + "%";
 
-        const minRequiredLen = SAMPLE_FREQ * 3; // 最低3秒は待つ
+        const minRequiredLen = TARGET_SAMPLE_FREQ * 3; 
         
         if (energyLog.length >= minRequiredLen && Date.now() - lastUpdate > 1000) {
             calcBPM();
@@ -188,34 +195,52 @@
         }
     }
 
-    function getCorrelation(normalized, bpm) {
-        let step = (60 / bpm) * SAMPLE_FREQ;
+    // 【究極精度 2】 コムフィルター型 自己相関アルゴリズム
+    // 1拍後、2拍後、3拍後、4拍後を同時にチェックし、曲のハネ・スウィングを無視する
+    function getCombCorrelation(normalized, bpm, actualSampleFreq) {
+        let baseStep = (60 / bpm) * actualSampleFreq;
         let corr = 0;
         let count = 0;
-        for (let i = 0; i < normalized.length - Math.ceil(step); i++) {
-            let j = i + step;
-            let i1 = Math.floor(j), i2 = Math.ceil(j), frac = j - i1;
-            let val = normalized[i1] * (1 - frac) + normalized[i2] * frac;
-            corr += normalized[i] * val;
-            count++;
+        let maxLags = 4; // 4拍先まで見る
+        
+        for (let lag = 1; lag <= maxLags; lag++) {
+            let step = baseStep * lag;
+            if (step >= normalized.length) break;
+            
+            for (let i = 0; i < normalized.length - Math.ceil(step); i++) {
+                let j = i + step;
+                let i1 = Math.floor(j), i2 = Math.ceil(j), frac = j - i1;
+                let val = normalized[i1] * (1 - frac) + normalized[i2] * frac;
+                corr += normalized[i] * val;
+                count++;
+            }
         }
         return count > 0 ? corr / count : 0;
     }
 
     function calcBPM() {
-        const mean = energyLog.reduce((a, b) => a + b, 0) / energyLog.length;
-        const normalized = energyLog.map(v => v - mean);
+        // 【究極精度 1 続き】 記録した実時間から「真のサンプリング周波数」を逆算
+        let actualDurationSec = (timeLog[timeLog.length - 1] - timeLog[0]) / 1000;
+        let ACTUAL_SAMPLE_FREQ = (energyLog.length - 1) / actualDurationSec;
+
+        // ハニング窓（Hann Window）の適用：両端の突然のカットによるノイズを防ぐ
+        const windowed = energyLog.map((val, i) => {
+            const multiplier = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (energyLog.length - 1)));
+            return val * multiplier;
+        });
+
+        const mean = windowed.reduce((a, b) => a + b, 0) / windowed.length;
+        const normalized = windowed.map(v => v - mean);
 
         let correlations = [];
-        
-        // 負荷を無視して、全範囲を総当たり計算
         for (let bpm = 60; bpm <= 182; bpm++) {
-            correlations[bpm] = getCorrelation(normalized, bpm);
+            correlations[bpm] = getCombCorrelation(normalized, bpm, ACTUAL_SAMPLE_FREQ);
         }
 
         let coarseBPM = 0;
         let maxPeakCorr = -Infinity;
 
+        // ピークピッキング
         for (let bpm = 61; bpm <= 180; bpm++) {
             if (correlations[bpm] > correlations[bpm - 1] && correlations[bpm] > correlations[bpm + 1]) {
                 if (correlations[bpm] > maxPeakCorr) {
@@ -227,19 +252,21 @@
 
         if (coarseBPM === 0) return;
 
-        let bestBPM = coarseBPM;
-        let maxCorr = -Infinity;
-
-        // 【極限精度】 探索ステップを 0.02 刻みに細分化 (超高負荷)
-        for (let bpm = coarseBPM - 1; bpm <= coarseBPM + 1; bpm += 0.02) {
-            let corr = getCorrelation(normalized, bpm);
-            if (corr > maxCorr) {
-                maxCorr = corr;
-                bestBPM = bpm;
-            }
+        // 【究極精度 3】 放物線補間 (Parabolic Interpolation)
+        // 0.1刻みの総当たり計算を廃止。数学の二次関数公式を用いて、頂点（無限精度の小数）を一発で割り出す
+        let alpha = correlations[coarseBPM - 1];
+        let beta = correlations[coarseBPM];
+        let gamma = correlations[coarseBPM + 1];
+        
+        let subOffset = 0;
+        let denominator = (alpha - 2 * beta + gamma);
+        if (denominator !== 0) {
+            subOffset = 0.5 * (alpha - gamma) / denominator;
         }
+        
+        let exactBPM = coarseBPM + subOffset;
 
-        bpmHistory.push(bestBPM);
+        bpmHistory.push(exactBPM);
         if (bpmHistory.length > BPM_HISTORY_SIZE) {
             bpmHistory.shift();
         }
@@ -249,7 +276,6 @@
         if (currentDisplayBPM === 0 || Math.abs(currentDisplayBPM - medianBPM) > 15) {
             currentDisplayBPM = medianBPM;
         } else {
-            // ここまで来たらデッドゾーンも0.2と厳しめに設定
             if (Math.abs(currentDisplayBPM - medianBPM) < 0.2) {
                 // デッドゾーン維持
             } else {
@@ -259,10 +285,6 @@
 
         document.getElementById('bpm').textContent = currentDisplayBPM.toFixed(1);
         document.getElementById('bpmDouble').textContent = "x2: " + (currentDisplayBPM * 2).toFixed(1);
-        
-        document.getElementById('status').textContent = "LOCKED";
-        document.getElementById('status').style.color = "#facc15";
-        document.getElementById('status').style.borderColor = "#facc15";
     }
 
     function fillRoundedRect(ctx, x, y, width, height, radius) {
@@ -289,10 +311,10 @@
 
         ctxWave.clearRect(0, 0, waveCanvasLogical.width, waveCanvasLogical.height);
         ctxWave.beginPath();
-        ctxWave.strokeStyle = "#facc15"; // ゴールド
+        ctxWave.strokeStyle = "#22d3ee"; // 量子シアン
         ctxWave.lineWidth = 1.5;
 
-        const maxLen = SAMPLE_FREQ * historySec;
+        const maxLen = TARGET_SAMPLE_FREQ * historySec;
         const waveStep = waveCanvasLogical.width / maxLen;
         const maxDrawEnergy = Math.max(...energyLog, 1);
         
@@ -308,7 +330,6 @@
         analyser.getByteFrequencyData(dataArray); 
         ctxVis.clearRect(0, 0, visCanvasLogical.width, visCanvasLogical.height);
 
-        // 4096FFTに合わせたバンドの再定義
         const ranges = [
             { start: 1, end: 20 },   
             { start: 21, end: 170 },  
