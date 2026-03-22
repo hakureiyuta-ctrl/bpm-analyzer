@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPM Analyzer Pro</title>
+    <title>BPM Analyzer Pro with 4-Band Vis</title>
     <style>
         body { 
             background: #020617; 
@@ -19,7 +19,7 @@
         }
         .card { 
             background: #1e293b; 
-            padding: 2rem; 
+            padding: 1.5rem; /* スマホ向けに少し詰める */
             border-radius: 1.5rem; 
             text-align: center; 
             width: 100%; 
@@ -28,13 +28,13 @@
             border: 1px solid #334155; 
         }
         .bpm-display { 
-            /* 小数点が表示されるため、少しだけ文字サイズを調整 */
             font-size: 70px; 
             font-weight: 900; 
             color: #10b981; 
-            margin: 10px 0; 
+            margin: 5px 0 10px 0; 
             text-shadow: 0 0 20px rgba(16, 185, 129, 0.4); 
             font-variant-numeric: tabular-nums;
+            line-height: 1;
         }
         .status-badge { 
             display: inline-block; 
@@ -45,17 +45,32 @@
             color: #94a3b8; 
             border: 1px solid #475569;
         }
-        .progress-container { width: 100%; height: 6px; background: #0f172a; border-radius: 3px; margin: 15px 0; overflow: hidden; }
-        #progressBar { width: 0%; height: 100%; background: #38bdf8; transition: 0.1s; }
         
-        canvas { width: 100%; height: 80px; background: #0f172a; border-radius: 8px; margin-bottom: 15px; }
+        canvas { 
+            width: 100%; 
+            background: #0f172a; 
+            border-radius: 8px; 
+            border: 1px solid #334155;
+            display: block; /* 隙間防止 */
+        }
+        
+        /* 既存の波形キャンバス (履歴表示) */
+        #canvas { height: 60px; margin-bottom: 5px; }
 
-        .controls { background: #0f172a; padding: 12px; border-radius: 8px; margin-bottom: 10px; text-align: left; }
-        input[type=range] { width: 100%; height: 30px; accent-color: #38bdf8; }
+        /* 新しい4バンドビジュアライザーキャンバス (リアルタイム表示) */
+        #visualizer { height: 70px; margin-bottom: 10px; }
+
+        .progress-container { width: 100%; height: 6px; background: #0f172a; border-radius: 3px; margin-bottom: 10px; overflow: hidden; }
+        #progressBar { width: 0%; height: 100%; background: #38bdf8; transition: 0.1s; }
+
+        .controls { background: #0f172a; padding: 10px; border-radius: 8px; margin-bottom: 8px; text-align: left; }
+        input[type=range] { width: 100%; height: 25px; accent-color: #38bdf8; margin: 0; }
+        .slider-label-row { display:flex; justify-content:space-between; font-size:0.75rem; color:#94a3b8; margin-bottom:3px; }
 
         button { 
-            background: #10b981; color: white; border: none; padding: 18px; 
+            background: #10b981; color: white; border: none; padding: 16px; 
             border-radius: 12px; font-weight: bold; width: 100%; font-size: 1.1rem;
+            cursor: pointer;
         }
         #resetBtn { background: #475569; margin-top: 5px; padding: 10px; font-size: 0.9rem; }
     </style>
@@ -64,8 +79,8 @@
 
 <div class="card">
     <div id="setup">
-        <h2 style="margin-bottom:10px;">BPM Mic Pro</h2>
-        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:20px;">0.1単位の超精密解析モード</p>
+        <h2 style="margin-bottom:5px;">BPM Mic Pro</h2>
+        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:15px;">0.1単位の精密解析 ＋ 4バンドVis</p>
         <button id="startBtn">🎤 測定を開始</button>
     </div>
 
@@ -74,7 +89,7 @@
         <div class="bpm-display" id="bpm">--.-</div>
         
         <div class="controls">
-            <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#94a3b8; margin-bottom:5px;">
+            <div class="slider-label-row">
                 <span>🎙️ 入力音量 (Gain)</span>
                 <span id="volumeLabel">x1.0</span>
             </div>
@@ -82,15 +97,18 @@
         </div>
 
         <div class="controls">
-            <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#94a3b8; margin-bottom:5px;">
+            <div class="slider-label-row">
                 <span>⏱️ 解析バッファ</span>
                 <span id="bufferLabel">4s</span>
             </div>
             <input type="range" id="bufferSlider" min="2" max="10" step="1" value="4">
         </div>
 
-        <div class="progress-container"><div id="progressBar"></div></div>
         <canvas id="canvas"></canvas>
+
+        <canvas id="visualizer"></canvas>
+
+        <div class="progress-container"><div id="progressBar"></div></div>
 
         <button id="resetBtn" onclick="location.reload()">終了 / リセット</button>
     </div>
@@ -98,7 +116,7 @@
 
 <script>
     let audioCtx, analyser, dataArray, gainNode;
-    const SAMPLE_FREQ = 100; 
+    const SAMPLE_FREQ = 100; // BPM解析用のサンプリング周波数 (Hz)
     let historySec = 4;
     let energyLog = [];
     let lastUpdate = 0;
@@ -106,6 +124,32 @@
     const startBtn = document.getElementById('startBtn');
     const bufferSlider = document.getElementById('bufferSlider');
     const volumeSlider = document.getElementById('volumeSlider');
+
+    // 4バンドビジュアライザー用のキャンバスコンテキスト
+    const visCanvas = document.getElementById('visualizer');
+    const ctxVis = visCanvas.getContext('2d');
+
+    // 既存の波形キャンバスコンテキスト
+    const canvas = document.getElementById('canvas');
+    const ctxWave = canvas.getContext('2d');
+
+    // 4バンドの色設定（Slateカラーに馴染むモダンな色）
+    const bandColors = [
+        '#ec4899', // Band 1 (低域): ピンク (キック/ベース)
+        '#f59e0b', // Band 2 (中低域): アンバー (ボーカル下部/スネア)
+        '#10b981', // Band 3 (中高域): エメラルド (ボーカル芯/ギター)
+        '#38bdf8'  // Band 4 (高域): シアン (ハイハット/シンバル)
+    ];
+
+    // 高解像度ディスプレイ対応
+    function adjustCanvasResolution(c, ctx) {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = c.getBoundingClientRect();
+        c.width = rect.width * dpr;
+        c.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        return { width: rect.width, height: rect.height };
+    }
 
     startBtn.onclick = async () => {
         try {
@@ -116,6 +160,10 @@
             document.getElementById('setup').style.display = 'none';
             document.getElementById('ui').style.display = 'block';
 
+            // キャンバス解像度の調整（ Retinaなど対応 ）
+            adjustCanvasResolution(canvas, ctxWave);
+            adjustCanvasResolution(visCanvas, ctxVis);
+
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             const source = audioCtx.createMediaStreamSource(stream);
             
@@ -123,7 +171,7 @@
             gainNode.gain.value = parseFloat(volumeSlider.value);
 
             analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 512;
+            analyser.fftSize = 512; // 256ビンの周波数データ
             
             source.connect(gainNode);
             gainNode.connect(analyser);
@@ -146,13 +194,14 @@
     bufferSlider.oninput = (e) => {
         historySec = parseInt(e.target.value);
         document.getElementById('bufferLabel').textContent = historySec + "s";
-        energyLog = []; 
+        energyLog = []; // バッファサイズ変更時はリセット
     };
 
     function analyze() {
         if (!analyser) return;
         analyser.getByteFrequencyData(dataArray);
 
+        // 既存のBPM解析用低域エネルギー抽出 (ビン1~5の合計)
         let energy = 0;
         for(let i=1; i<6; i++) energy += dataArray[i];
         energyLog.push(energy);
@@ -160,15 +209,17 @@
         const maxLen = SAMPLE_FREQ * historySec;
         if (energyLog.length > maxLen) energyLog.shift();
 
+        // 進捗バー
         document.getElementById('progressBar').style.width = (energyLog.length / maxLen * 100) + "%";
 
+        // バッファが溜まったら0.5秒おきにBPM計算
         if (energyLog.length >= maxLen && Date.now() - lastUpdate > 500) {
             calcBPM();
             lastUpdate = Date.now();
         }
     }
 
-    // 相関を計算するヘルパー関数
+    // BPM計算関数 (2段階サーチ) は変更なし
     function getCorrelation(normalized, bpm) {
         let step = (60 / bpm) * SAMPLE_FREQ;
         let corr = 0;
@@ -187,7 +238,6 @@
         const mean = energyLog.reduce((a, b) => a + b, 0) / energyLog.length;
         const normalized = energyLog.map(v => v - mean);
 
-        // --- 1段階目: 粗い探索 (整数刻み) ---
         let coarseBPM = 0;
         let maxCorr = -Infinity;
 
@@ -199,8 +249,6 @@
             }
         }
 
-        // --- 2段階目: 精密探索 (0.1刻み) ---
-        // 見つけた粗いBPMの前後1の範囲（例：120なら、119.0〜121.0）を0.1刻みで探す
         let bestBPM = coarseBPM;
         maxCorr = -Infinity;
 
@@ -212,32 +260,94 @@
             }
         }
 
-        // 画面には小数点第1位まで表示 (例: 128.0)
         document.getElementById('bpm').textContent = bestBPM.toFixed(1);
         document.getElementById('status').textContent = "LOCKED";
         document.getElementById('status').style.color = "#10b981";
+    }
+
+    // 角丸長方形を描画するヘルパー関数
+    function fillRoundedRect(ctx, x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+        ctx.fill();
     }
 
     function draw() {
         requestAnimationFrame(draw);
         if (!analyser) return;
 
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.beginPath();
-        ctx.strokeStyle = "#38bdf8";
-        ctx.lineWidth = 2;
+        // --- キャンバスのサイズを取得 (Retina対応後の論理サイズ) ---
+        const waveCanvasLogical = { width: canvas.width / (window.devicePixelRatio || 1), height: canvas.height / (window.devicePixelRatio || 1) };
+        const visCanvasLogical = { width: visCanvas.width / (window.devicePixelRatio || 1), height: visCanvas.height / (window.devicePixelRatio || 1) };
 
-        const step = canvas.width / (SAMPLE_FREQ * historySec);
+        // ==========================================
+        // 1. 既存の波形 (低域エネルギー履歴) の描画
+        // ==========================================
+        ctxWave.clearRect(0, 0, waveCanvasLogical.width, waveCanvasLogical.height);
+        ctxWave.beginPath();
+        ctxWave.strokeStyle = "#38bdf8"; // 既存のシアン
+        ctxWave.lineWidth = 1.5;
+
+        const waveStep = waveCanvasLogical.width / (SAMPLE_FREQ * historySec);
         for (let i = 0; i < energyLog.length; i++) {
-            let y = canvas.height - (energyLog[i] / 1000 * canvas.height);
-            y = Math.max(0, Math.min(canvas.height, y));
+            let y = waveCanvasLogical.height - (energyLog[i] / 1000 * waveCanvasLogical.height);
+            y = Math.max(0, Math.min(waveCanvasLogical.height, y));
             
-            if (i === 0) ctx.moveTo(0, y);
-            else ctx.lineTo(i * step, y);
+            if (i === 0) ctxWave.moveTo(0, y);
+            else ctxWave.lineTo(i * waveStep, y);
         }
-        ctx.stroke();
+        ctxWave.stroke();
+
+        // ==========================================
+        // 2. 新しい4バンドビジュアライザー (リアルタイム) の描画
+        // ==========================================
+        analyser.getByteFrequencyData(dataArray); // 描画直前の最新データを取得
+        ctxVis.clearRect(0, 0, visCanvasLogical.width, visCanvasLogical.height);
+
+        // 4バンドの周波数範囲（ビン単位、目安）
+        // 1ビン ≈ 94Hz (48kHzサンプリングの場合)
+        const ranges = [
+            { start: 0, end: 5 },   // Band 1 (低域): 〜約560Hz
+            { start: 6, end: 20 },  // Band 2 (中低域): 約560Hz〜2.4kHz
+            { start: 21, end: 80 }, // Band 3 (中高域): 約2.4kHz〜10kHz
+            { start: 81, end: 150 } // Band 4 (高域): 約10kHz〜スマホマイク上限
+        ];
+
+        const numBands = ranges.length;
+        const barGap = 8; // バー間の余白
+        const barWidth = (visCanvasLogical.width - (barGap * (numBands + 1))) / numBands; // バーの幅を計算
+        const barRadius = 6; // バーの角丸半径
+
+        for (let i = 0; i < numBands; i++) {
+            const range = ranges[i];
+            let sum = 0;
+            for (let j = range.start; j <= range.end; j++) {
+                sum += dataArray[j];
+            }
+            const avg = sum / (range.end - range.start + 1);
+            
+            // 音量（0〜255）をキャンバスの高さ（0.1倍〜1.0倍）にマッピング
+            const minBarHeight = 10; // 音がなくても最低限表示
+            let barHeight = (avg / 255) * visCanvasLogical.height;
+            barHeight = Math.max(minBarHeight, barHeight);
+            barHeight = Math.min(visCanvasLogical.height, barHeight); // 上限クリップ
+
+            const x = barGap + i * (barWidth + barGap);
+            const y = visCanvasLogical.height - barHeight;
+
+            // 塗りつぶし
+            ctxVis.fillStyle = bandColors[i];
+            fillRoundedRect(ctxVis, x, y, barWidth, barHeight, barRadius);
+        }
     }
 </script>
 </body>
