@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPM Analyzer Pro Ultra</title>
+    <title>BPM Analyzer Pro Ultra Stable</title>
     <style>
         body { 
             background: #020617; 
@@ -34,6 +34,7 @@
             padding: 15px;
             border-radius: 12px;
             border: 1px solid #334155;
+            position: relative;
         }
         
         .bpm-display { 
@@ -45,7 +46,6 @@
             line-height: 1;
         }
         
-        /* 確実に追加されたと分かるように、黄色で少し大きめに設定 */
         .bpm-double {
             font-size: 1.5rem;
             color: #fbbf24;
@@ -97,7 +97,7 @@
 <div class="card">
     <div id="setup">
         <h2 style="margin-bottom:5px;">BPM Mic Pro</h2>
-        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:15px;">MAX180 / 倍テンポ同時表示</p>
+        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:15px;">超安定ロック ＆ 倍テンポ表示</p>
         <button id="startBtn">🎤 測定を開始</button>
     </div>
 
@@ -140,7 +140,11 @@
     let historySec = 4;
     let energyLog = [];
     let lastUpdate = 0;
+    
+    // 【安定化用変数】
     let currentDisplayBPM = 0;
+    let bpmHistory = []; // 直近の解析結果を保存する配列
+    const BPM_HISTORY_SIZE = 7; // 中央値を取るためのサンプル数
 
     const startBtn = document.getElementById('startBtn');
     const bufferSlider = document.getElementById('bufferSlider');
@@ -208,6 +212,7 @@
         if (energyLog.length > maxLen) {
             energyLog = energyLog.slice(energyLog.length - maxLen);
         }
+        bpmHistory = []; // バッファ変更時は履歴もリセット
     };
 
     function analyze() {
@@ -258,7 +263,6 @@
 
         let correlations = [];
         
-        // 180ピッタリのピークを検知するために、計算自体は182まで行う
         for (let bpm = 60; bpm <= 182; bpm++) {
             correlations[bpm] = getCorrelation(normalized, bpm);
         }
@@ -266,7 +270,6 @@
         let coarseBPM = 0;
         let maxPeakCorr = -Infinity;
 
-        // 表示の最大値を 180 BPM に制限
         for (let bpm = 61; bpm <= 180; bpm++) {
             if (correlations[bpm] > correlations[bpm - 1] && correlations[bpm] > correlations[bpm + 1]) {
                 if (correlations[bpm] > maxPeakCorr) {
@@ -289,13 +292,30 @@
             }
         }
 
-        if (currentDisplayBPM === 0 || Math.abs(currentDisplayBPM - bestBPM) > 15) {
-            currentDisplayBPM = bestBPM;
+        // --- 【安定化ロジック1: メディアンフィルター】 ---
+        // 直近数回の結果を貯め、その真ん中の値（中央値）を採用することで外れ値を排除
+        bpmHistory.push(bestBPM);
+        if (bpmHistory.length > BPM_HISTORY_SIZE) {
+            bpmHistory.shift();
+        }
+        let sortedHistory = [...bpmHistory].sort((a, b) => a - b);
+        let medianBPM = sortedHistory[Math.floor(sortedHistory.length / 2)];
+
+
+        // --- 【安定化ロジック2: デッドゾーン ＆ EMA】 ---
+        if (currentDisplayBPM === 0 || Math.abs(currentDisplayBPM - medianBPM) > 15) {
+            // 最初、または曲が変わってBPMが大きく飛んだ時は即座に反映
+            currentDisplayBPM = medianBPM;
         } else {
-            currentDisplayBPM = (currentDisplayBPM * 0.8) + (bestBPM * 0.2);
+            // 変化量が 0.3 未満の微細な揺れなら数値を固定して揺らさない（デッドゾーン）
+            if (Math.abs(currentDisplayBPM - medianBPM) < 0.3) {
+                // currentDisplayBPM をそのまま維持
+            } else {
+                // それ以上の変化なら、より重いEMA（85%維持）でゆっくり追従させる
+                currentDisplayBPM = (currentDisplayBPM * 0.85) + (medianBPM * 0.15);
+            }
         }
 
-        // ここでメインと倍テンポ(x2)を描画しています！
         document.getElementById('bpm').textContent = currentDisplayBPM.toFixed(1);
         document.getElementById('bpmDouble').textContent = "x2: " + (currentDisplayBPM * 2).toFixed(1);
         
