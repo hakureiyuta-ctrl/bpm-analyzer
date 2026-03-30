@@ -2,366 +2,214 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BPM Analyzer Pro QUANTUM</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mic to 16-Band MIDI CC</title>
     <style>
-        body { background: #020617; color: #f8fafc; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
-        .card { background: #0f172a; padding: 1.5rem; border-radius: 1.5rem; text-align: center; width: 100%; max-width: 380px; box-shadow: 0 0 50px rgba(6, 182, 212, 0.2); border: 1px solid #1e293b; }
-        .bpm-container { margin: 5px 0 15px 0; background: #020617; padding: 15px; border-radius: 12px; border: 1px solid #1e293b; position: relative; box-shadow: inset 0 0 20px rgba(6, 182, 212, 0.05); }
-        
-        .bpm-display { font-size: 75px; font-weight: 900; color: #22d3ee; text-shadow: 0 0 25px rgba(34, 211, 238, 0.5); font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -2px; }
-        .bpm-double { font-size: 1.5rem; color: #a855f7; font-weight: bold; margin-top: 8px; font-variant-numeric: tabular-nums; text-shadow: 0 0 10px rgba(168, 85, 247, 0.4); }
-        
-        .status-badge { display: inline-block; padding: 4px 15px; background: #083344; border-radius: 20px; font-size: 0.75rem; color: #67e8f9; border: 1px solid #0e7490; margin-bottom: 5px; font-weight: bold; letter-spacing: 2px; }
-        
-        canvas { width: 100%; background: #020617; border-radius: 8px; border: 1px solid #1e293b; display: block; }
-        #canvas { height: 60px; margin-bottom: 5px; }
-        #visualizer { height: 70px; margin-bottom: 10px; }
-        
-        .progress-container { width: 100%; height: 4px; background: #1e293b; border-radius: 2px; margin-bottom: 15px; overflow: hidden; }
-        #progressBar { width: 0%; height: 100%; background: linear-gradient(90deg, #22d3ee, #a855f7); transition: 0.1s; }
-        
-        .controls { background: #020617; padding: 12px; border-radius: 8px; margin-bottom: 8px; text-align: left; border: 1px solid #1e293b; }
-        input[type=range] { width: 100%; height: 25px; accent-color: #22d3ee; margin: 0; }
-        .slider-label-row { display:flex; justify-content:space-between; font-size:0.75rem; color: #94a3b8; margin-bottom:5px; font-weight: bold; }
-        
-        button { background: linear-gradient(135deg, #06b6d4, #8b5cf6); color: #ffffff; border: none; padding: 16px; border-radius: 12px; font-weight: bold; width: 100%; font-size: 1.1rem; cursor: pointer; text-shadow: 0 2px 4px rgba(0,0,0,0.3); box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3); }
-        #resetBtn { background: transparent; color: #64748b; margin-top: 5px; padding: 10px; font-size: 0.8rem; box-shadow: none; border: 1px solid #334155; }
+        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+        .controls { margin-bottom: 20px; padding: 15px; background: #f0f0f0; border-radius: 8px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        select { padding: 10px; font-size: 16px; width: 100%; margin-top: 10px; }
+        .bar-container { display: flex; align-items: flex-end; height: 150px; gap: 4px; margin-top: 20px; border-bottom: 2px solid #333; }
+        .bar { flex: 1; background-color: #4CAF50; width: 100%; transition: height 0.05s ease; }
+        #log { margin-top: 20px; font-family: monospace; white-space: pre-wrap; font-size: 12px; color: #555; height: 100px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px;}
     </style>
 </head>
 <body>
 
-<div class="card">
-    <div id="setup">
-        <h2 style="margin-bottom:5px; color:#22d3ee;">QUANTUM ENGINE</h2>
-        <p style="color:#94a3b8; font-size:0.8rem; margin-bottom:15px;">コムフィルター & 動的サンプリング補正</p>
-        <button id="startBtn">⚡ 究極精度で解析開始</button>
+    <h2>Mic to 16-Band MIDI CC</h2>
+    
+    <div class="controls">
+        <button id="toggleBtn">Start Microphone & MIDI</button>
+        <p>MIDI Output Device:</p>
+        <select id="midiOutputSelect">
+            <option value="">(No MIDI Outputs Found)</option>
+        </select>
     </div>
 
-    <div id="ui" style="display:none">
-        <div id="status" class="status-badge">QUANTUM SYNC</div>
-        
-        <div class="bpm-container">
-            <div class="bpm-display" id="bpm">--.-</div>
-            <div class="bpm-double" id="bpmDouble">x2: --.-</div>
-        </div>
-        
-        <div class="controls">
-            <div class="slider-label-row">
-                <span>🎙️ 入力音量 (Gain)</span>
-                <span id="volumeLabel" style="color:#22d3ee;">x1.0</span>
-            </div>
-            <input type="range" id="volumeSlider" min="0.1" max="5.0" step="0.1" value="1.0">
+    <div><strong>16-Band Visualizer (0-127)</strong></div>
+    <div class="bar-container" id="visualizer">
         </div>
 
-        <div class="controls">
-            <div class="slider-label-row">
-                <span>⏱️ 解析バッファ</span>
-                <span id="bufferLabel" style="color:#a855f7;">6s</span>
-            </div>
-            <input type="range" id="bufferSlider" min="4" max="12" step="1" value="6">
-        </div>
+    <div id="log">Logs will appear here...</div>
 
-        <canvas id="canvas"></canvas>
-        <canvas id="visualizer"></canvas>
+    <script>
+        const NUM_BANDS = 16;
+        const BASE_CC = 20; // 送信開始するCC番号 (20〜35)
+        const MIDI_CHANNEL = 0; // チャンネル1
 
-        <div class="progress-container"><div id="progressBar"></div></div>
+        let audioContext;
+        let analyser;
+        let microphone;
+        let isRunning = false;
+        let animationId;
 
-        <button id="resetBtn" onclick="location.reload()">終了 / リセット</button>
-    </div>
-</div>
+        let midiAccess;
+        let selectedMidiOutput = null;
 
-<script>
-    let audioCtx, analyser, dataArray, gainNode;
-    
-    // 目標のサンプリング周波数 (5ms間隔)
-    const TARGET_SAMPLE_FREQ = 200; 
-    let historySec = 6; 
-    
-    // 【究極精度】 データと「記録した正確な時間」をペアで保存する
-    let energyLog = [];
-    let timeLog = []; 
-    let prevSpectrum = new Uint8Array(4096);
-    let lastUpdate = 0;
-    
-    let currentDisplayBPM = 0;
-    let bpmHistory = []; 
-    const BPM_HISTORY_SIZE = 3; 
+        const toggleBtn = document.getElementById('toggleBtn');
+        const midiOutputSelect = document.getElementById('midiOutputSelect');
+        const visualizer = document.getElementById('visualizer');
+        const logEl = document.getElementById('log');
 
-    const startBtn = document.getElementById('startBtn');
-    const bufferSlider = document.getElementById('bufferSlider');
-    const volumeSlider = document.getElementById('volumeSlider');
-
-    const visCanvas = document.getElementById('visualizer');
-    const ctxVis = visCanvas.getContext('2d');
-    const canvas = document.getElementById('canvas');
-    const ctxWave = canvas.getContext('2d');
-
-    const bandColors = ['#ec4899', '#f59e0b', '#10b981', '#22d3ee'];
-
-    function adjustCanvasResolution(c, ctx) {
-        const dpr = window.devicePixelRatio || 1;
-        const rect = c.getBoundingClientRect();
-        c.width = rect.width * dpr;
-        c.height = rect.height * dpr;
-        ctx.scale(dpr, dpr);
-        return { width: rect.width, height: rect.height };
-    }
-
-    startBtn.onclick = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } 
-            });
-            
-            document.getElementById('setup').style.display = 'none';
-            document.getElementById('ui').style.display = 'block';
-
-            adjustCanvasResolution(canvas, ctxWave);
-            adjustCanvasResolution(visCanvas, ctxVis);
-
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const source = audioCtx.createMediaStreamSource(stream);
-            
-            gainNode = audioCtx.createGain();
-            gainNode.gain.value = parseFloat(volumeSlider.value);
-
-            analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 4096; 
-            
-            source.connect(gainNode);
-            gainNode.connect(analyser);
-
-            dataArray = new Uint8Array(analyser.frequencyBinCount);
-            prevSpectrum = new Uint8Array(analyser.frequencyBinCount);
-
-            // setIntervalのズレを許容し、実際の時間をtimeLogに記録する
-            setInterval(analyze, 1000 / TARGET_SAMPLE_FREQ);
-            draw();
-        } catch (err) {
-            alert("マイクの使用が拒否されました。設定を確認してください。");
-        }
-    };
-
-    volumeSlider.oninput = (e) => {
-        const val = parseFloat(e.target.value);
-        document.getElementById('volumeLabel').textContent = "x" + val.toFixed(1);
-        if (gainNode) gainNode.gain.value = val;
-    };
-
-    bufferSlider.oninput = (e) => {
-        historySec = parseInt(e.target.value);
-        document.getElementById('bufferLabel').textContent = historySec + "s";
-        
-        // バッファ変更時はデータを安全に切り詰める
-        const maxLen = TARGET_SAMPLE_FREQ * historySec;
-        if (energyLog.length > maxLen) {
-            energyLog = energyLog.slice(energyLog.length - maxLen);
-            timeLog = timeLog.slice(timeLog.length - maxLen);
-        }
-        bpmHistory = []; 
-    };
-
-    function analyze() {
-        if (!analyser) return;
-        analyser.getByteFrequencyData(dataArray);
-
-        let flux = 0;
-        for (let i = 2; i < 300; i++) {
-            let diff = dataArray[i] - prevSpectrum[i];
-            if (diff > 0) flux += diff;
-            prevSpectrum[i] = dataArray[i];
+        // 16個のバーを生成
+        const bars = [];
+        for (let i = 0; i < NUM_BANDS; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'bar';
+            visualizer.appendChild(bar);
+            bars.push(bar);
         }
 
-        flux = Math.pow(flux, 1.2);
-        
-        // 【究極精度 1】 ブラウザのタイマーのズレを実時間(performance.now)で記録
-        energyLog.push(flux);
-        timeLog.push(performance.now());
-
-        const maxLen = TARGET_SAMPLE_FREQ * historySec;
-        if (energyLog.length > maxLen) {
-            energyLog.shift();
-            timeLog.shift();
+        function log(msg) {
+            logEl.textContent = msg + '\n' + logEl.textContent;
         }
 
-        document.getElementById('progressBar').style.width = (energyLog.length / maxLen * 100) + "%";
-
-        const minRequiredLen = TARGET_SAMPLE_FREQ * 3; 
-        
-        if (energyLog.length >= minRequiredLen && Date.now() - lastUpdate > 1000) {
-            calcBPM();
-            lastUpdate = Date.now();
-        }
-    }
-
-    // 【究極精度 2】 コムフィルター型 自己相関アルゴリズム
-    // 1拍後、2拍後、3拍後、4拍後を同時にチェックし、曲のハネ・スウィングを無視する
-    function getCombCorrelation(normalized, bpm, actualSampleFreq) {
-        let baseStep = (60 / bpm) * actualSampleFreq;
-        let corr = 0;
-        let count = 0;
-        let maxLags = 4; // 4拍先まで見る
-        
-        for (let lag = 1; lag <= maxLags; lag++) {
-            let step = baseStep * lag;
-            if (step >= normalized.length) break;
-            
-            for (let i = 0; i < normalized.length - Math.ceil(step); i++) {
-                let j = i + step;
-                let i1 = Math.floor(j), i2 = Math.ceil(j), frac = j - i1;
-                let val = normalized[i1] * (1 - frac) + normalized[i2] * frac;
-                corr += normalized[i] * val;
-                count++;
+        // --- 1. Web MIDI API のセットアップ ---
+        async function setupMidi() {
+            try {
+                midiAccess = await navigator.requestMIDIAccess();
+                updateMidiOutputs();
+                midiAccess.onstatechange = updateMidiOutputs;
+                log("MIDI Access Granted.");
+            } catch (err) {
+                log("MIDI Access Failed: " + err.message);
+                alert("このブラウザはWeb MIDI APIをサポートしていないか、権限が拒否されました。");
             }
         }
-        return count > 0 ? corr / count : 0;
-    }
 
-    function calcBPM() {
-        // 【究極精度 1 続き】 記録した実時間から「真のサンプリング周波数」を逆算
-        let actualDurationSec = (timeLog[timeLog.length - 1] - timeLog[0]) / 1000;
-        let ACTUAL_SAMPLE_FREQ = (energyLog.length - 1) / actualDurationSec;
+        function updateMidiOutputs() {
+            midiOutputSelect.innerHTML = '';
+            const outputs = Array.from(midiAccess.outputs.values());
+            
+            if (outputs.length === 0) {
+                midiOutputSelect.innerHTML = '<option value="">(No MIDI Outputs Found)</option>';
+                selectedMidiOutput = null;
+                return;
+            }
 
-        // ハニング窓（Hann Window）の適用：両端の突然のカットによるノイズを防ぐ
-        const windowed = energyLog.map((val, i) => {
-            const multiplier = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (energyLog.length - 1)));
-            return val * multiplier;
+            outputs.forEach(output => {
+                const option = document.createElement('option');
+                option.value = output.id;
+                option.text = output.name;
+                midiOutputSelect.appendChild(option);
+            });
+
+            // 最初のデバイスを選択
+            selectedMidiOutput = midiAccess.outputs.get(midiOutputSelect.value);
+        }
+
+        midiOutputSelect.addEventListener('change', (e) => {
+            selectedMidiOutput = midiAccess.outputs.get(e.target.value);
+            log("Selected MIDI Output: " + selectedMidiOutput.name);
         });
 
-        const mean = windowed.reduce((a, b) => a + b, 0) / windowed.length;
-        const normalized = windowed.map(v => v - mean);
+        // --- 2. Web Audio API とマイクのセットアップ ---
+        async function toggleAudio() {
+            if (isRunning) {
+                stopAudio();
+                return;
+            }
 
-        let correlations = [];
-        for (let bpm = 60; bpm <= 182; bpm++) {
-            correlations[bpm] = getCombCorrelation(normalized, bpm, ACTUAL_SAMPLE_FREQ);
+            try {
+                // ブラウザの仕様上、ユーザーアクション（クリック）時にAudioContextを作成する必要があります
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                microphone = audioContext.createMediaStreamSource(stream);
+                
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 1024; // 1024にすると512の周波数ビンが得られる
+                analyser.smoothingTimeConstant = 0.5; // 0.0〜1.0 (値が大きいほど動きが滑らかになる)
+                
+                microphone.connect(analyser);
+                
+                isRunning = true;
+                toggleBtn.textContent = "Stop";
+                log("Microphone started. Analyzing...");
+                
+                processAudio();
+            } catch (err) {
+                log("Audio Error: " + err.message);
+                alert("マイクへのアクセスが拒否されたか、エラーが発生しました。");
+            }
         }
 
-        let coarseBPM = 0;
-        let maxPeakCorr = -Infinity;
+        function stopAudio() {
+            isRunning = false;
+            cancelAnimationFrame(animationId);
+            if (audioContext) {
+                audioContext.close();
+            }
+            toggleBtn.textContent = "Start Microphone & MIDI";
+            bars.forEach(bar => bar.style.height = '0%');
+            log("Stopped.");
+        }
 
-        // ピークピッキング
-        for (let bpm = 61; bpm <= 180; bpm++) {
-            if (correlations[bpm] > correlations[bpm - 1] && correlations[bpm] > correlations[bpm + 1]) {
-                if (correlations[bpm] > maxPeakCorr) {
-                    maxPeakCorr = correlations[bpm];
-                    coarseBPM = bpm;
+        // --- 3. 音声解析とMIDI送信ループ ---
+        function processAudio() {
+            if (!isRunning) return;
+
+            // analyser.fftSizeが1024の場合、frequencyBinCountは512になります
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            
+            // FFT結果を 0〜255 のバイトデータとして取得
+            analyser.getByteFrequencyData(dataArray);
+
+            // 512のビンを16バンドに分割 (512 / 16 = 32ビン/バンド)
+            const binsPerBand = Math.floor(bufferLength / NUM_BANDS);
+            const bandGains = new Array(NUM_BANDS).fill(0);
+
+            for (let i = 0; i < NUM_BANDS; i++) {
+                let sum = 0;
+                const startBin = i * binsPerBand;
+                const endBin = startBin + binsPerBand;
+
+                for (let j = startBin; j < endBin; j++) {
+                    sum += dataArray[j];
                 }
+
+                // バンド内の平均値を計算 (0〜255)
+                const avg = sum / binsPerBand;
+                
+                // MIDIの 0〜127 の範囲にマッピング (255 / 2 ≒ 127)
+                let midiValue = Math.floor(avg / 2);
+                
+                // ノイズゲート処理（小さな音は0にする）
+                if (midiValue < 5) midiValue = 0;
+
+                bandGains[i] = midiValue;
+
+                // UIのバーを更新
+                bars[i].style.height = (midiValue / 127 * 100) + '%';
+            }
+
+            // MIDI CCを送信
+            sendMidiCC(bandGains);
+
+            // 次のフレームを要求
+            animationId = requestAnimationFrame(processAudio);
+        }
+
+        function sendMidiCC(bandGains) {
+            if (!selectedMidiOutput) return;
+
+            // コントロールチェンジのステータスバイト (0xB0 = 176)
+            const statusByte = 0xB0 | MIDI_CHANNEL;
+
+            for (let i = 0; i < NUM_BANDS; i++) {
+                const ccNumber = BASE_CC + i;
+                const value = bandGains[i];
+                
+                // [ステータス, CC番号, 値] の配列を送信
+                selectedMidiOutput.send([statusByte, ccNumber, value]);
             }
         }
 
-        if (coarseBPM === 0) return;
+        // 初期化
+        setupMidi();
+        toggleBtn.addEventListener('click', toggleAudio);
 
-        // 【究極精度 3】 放物線補間 (Parabolic Interpolation)
-        // 0.1刻みの総当たり計算を廃止。数学の二次関数公式を用いて、頂点（無限精度の小数）を一発で割り出す
-        let alpha = correlations[coarseBPM - 1];
-        let beta = correlations[coarseBPM];
-        let gamma = correlations[coarseBPM + 1];
-        
-        let subOffset = 0;
-        let denominator = (alpha - 2 * beta + gamma);
-        if (denominator !== 0) {
-            subOffset = 0.5 * (alpha - gamma) / denominator;
-        }
-        
-        let exactBPM = coarseBPM + subOffset;
-
-        bpmHistory.push(exactBPM);
-        if (bpmHistory.length > BPM_HISTORY_SIZE) {
-            bpmHistory.shift();
-        }
-        let sortedHistory = [...bpmHistory].sort((a, b) => a - b);
-        let medianBPM = sortedHistory[Math.floor(sortedHistory.length / 2)];
-
-        if (currentDisplayBPM === 0 || Math.abs(currentDisplayBPM - medianBPM) > 15) {
-            currentDisplayBPM = medianBPM;
-        } else {
-            if (Math.abs(currentDisplayBPM - medianBPM) < 0.2) {
-                // デッドゾーン維持
-            } else {
-                currentDisplayBPM = (currentDisplayBPM * 0.8) + (medianBPM * 0.2);
-            }
-        }
-
-        document.getElementById('bpm').textContent = currentDisplayBPM.toFixed(1);
-        document.getElementById('bpmDouble').textContent = "x2: " + (currentDisplayBPM * 2).toFixed(1);
-    }
-
-    function fillRoundedRect(ctx, x, y, width, height, radius) {
-        ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + width - radius, y);
-        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-        ctx.lineTo(x + width, y + height - radius);
-        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-        ctx.lineTo(x + radius, y + height);
-        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
-        ctx.closePath();
-        ctx.fill();
-    }
-
-    function draw() {
-        requestAnimationFrame(draw);
-        if (!analyser) return;
-
-        const waveCanvasLogical = { width: canvas.width / (window.devicePixelRatio || 1), height: canvas.height / (window.devicePixelRatio || 1) };
-        const visCanvasLogical = { width: visCanvas.width / (window.devicePixelRatio || 1), height: visCanvas.height / (window.devicePixelRatio || 1) };
-
-        ctxWave.clearRect(0, 0, waveCanvasLogical.width, waveCanvasLogical.height);
-        ctxWave.beginPath();
-        ctxWave.strokeStyle = "#22d3ee"; // 量子シアン
-        ctxWave.lineWidth = 1.5;
-
-        const maxLen = TARGET_SAMPLE_FREQ * historySec;
-        const waveStep = waveCanvasLogical.width / maxLen;
-        const maxDrawEnergy = Math.max(...energyLog, 1);
-        
-        for (let i = 0; i < energyLog.length; i++) {
-            let y = waveCanvasLogical.height - (energyLog[i] / maxDrawEnergy * waveCanvasLogical.height * 0.9);
-            y = Math.max(0, Math.min(waveCanvasLogical.height, y));
-            
-            if (i === 0) ctxWave.moveTo(0, y);
-            else ctxWave.lineTo(i * waveStep, y);
-        }
-        ctxWave.stroke();
-
-        analyser.getByteFrequencyData(dataArray); 
-        ctxVis.clearRect(0, 0, visCanvasLogical.width, visCanvasLogical.height);
-
-        const ranges = [
-            { start: 1, end: 20 },   
-            { start: 21, end: 170 },  
-            { start: 171, end: 680 }, 
-            { start: 681, end: 1600 } 
-        ];
-
-        const numBands = ranges.length;
-        const barGap = 8; 
-        const barWidth = (visCanvasLogical.width - (barGap * (numBands + 1))) / numBands; 
-        const barRadius = 6; 
-
-        for (let i = 0; i < numBands; i++) {
-            const range = ranges[i];
-            let sum = 0;
-            for (let j = range.start; j <= range.end; j++) {
-                sum += dataArray[j];
-            }
-            const avg = sum / (range.end - range.start + 1);
-            
-            const minBarHeight = 10; 
-            let barHeight = (avg / 255) * visCanvasLogical.height;
-            barHeight = Math.max(minBarHeight, barHeight);
-            barHeight = Math.min(visCanvasLogical.height, barHeight); 
-
-            const x = barGap + i * (barWidth + barGap);
-            const y = visCanvasLogical.height - barHeight;
-
-            ctxVis.fillStyle = bandColors[i];
-            fillRoundedRect(ctxVis, x, y, barWidth, barHeight, barRadius);
-        }
-    }
-</script>
+    </script>
 </body>
 </html>
