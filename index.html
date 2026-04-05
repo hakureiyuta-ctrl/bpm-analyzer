@@ -3,213 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mic to 16-Band MIDI CC</title>
+    <title>ハイボール濃さ判定チェッカー</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-        .controls { margin-bottom: 20px; padding: 15px; background: #f0f0f0; border-radius: 8px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
-        select { padding: 10px; font-size: 16px; width: 100%; margin-top: 10px; }
-        .bar-container { display: flex; align-items: flex-end; height: 150px; gap: 4px; margin-top: 20px; border-bottom: 2px solid #333; }
-        .bar { flex: 1; background-color: #4CAF50; width: 100%; transition: height 0.05s ease; }
-        #log { margin-top: 20px; font-family: monospace; white-space: pre-wrap; font-size: 12px; color: #555; height: 100px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px;}
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            background-color: #222;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+        }
+        #video-container {
+            position: relative;
+            display: inline-block;
+            margin-top: 20px;
+        }
+        video {
+            width: 100%;
+            max-width: 400px;
+            background-color: #000;
+            border-radius: 8px;
+        }
+        /* 画面中央の測定エリアを示すターゲットマーク */
+        #target-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 40px;
+            height: 40px;
+            border: 2px solid #00ff00;
+            transform: translate(-50%, -50%);
+            box-sizing: border-box;
+            pointer-events: none;
+        }
+        #result {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #f39c12; /* 琥珀色っぽい文字色 */
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
 
-    <h2>Mic to 16-Band MIDI CC</h2>
-    
-    <div class="controls">
-        <button id="toggleBtn">Start Microphone & MIDI</button>
-        <p>MIDI Output Device:</p>
-        <select id="midiOutputSelect">
-            <option value="">(No MIDI Outputs Found)</option>
-        </select>
+    <h1>ハイボール濃さ判定</h1>
+    <button id="startBtn">カメラを起動</button>
+
+    <div id="video-container">
+        <video id="camera" autoplay playsinline></video>
+        <div id="target-box"></div>
     </div>
 
-    <div><strong>16-Band Visualizer (0-127)</strong></div>
-    <div class="bar-container" id="visualizer">
-        </div>
+    <div id="result">濃さ: -- %</div>
 
-    <div id="log">Logs will appear here...</div>
+    <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
-        const NUM_BANDS = 16;
-        const BASE_CC = 20; // 送信開始するCC番号 (20〜35)
-        const MIDI_CHANNEL = 0; // チャンネル1
+        const video = document.getElementById('camera');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const resultDiv = document.getElementById('result');
+        const startBtn = document.getElementById('startBtn');
 
-        let audioContext;
-        let analyser;
-        let microphone;
-        let isRunning = false;
-        let animationId;
+        let isPlaying = false;
 
-        let midiAccess;
-        let selectedMidiOutput = null;
-
-        const toggleBtn = document.getElementById('toggleBtn');
-        const midiOutputSelect = document.getElementById('midiOutputSelect');
-        const visualizer = document.getElementById('visualizer');
-        const logEl = document.getElementById('log');
-
-        // 16個のバーを生成
-        const bars = [];
-        for (let i = 0; i < NUM_BANDS; i++) {
-            const bar = document.createElement('div');
-            bar.className = 'bar';
-            visualizer.appendChild(bar);
-            bars.push(bar);
-        }
-
-        function log(msg) {
-            logEl.textContent = msg + '\n' + logEl.textContent;
-        }
-
-        // --- 1. Web MIDI API のセットアップ ---
-        async function setupMidi() {
+        // カメラの起動処理
+        startBtn.addEventListener('click', async () => {
             try {
-                midiAccess = await navigator.requestMIDIAccess();
-                updateMidiOutputs();
-                midiAccess.onstatechange = updateMidiOutputs;
-                log("MIDI Access Granted.");
+                // 背面カメラを優先して取得
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" },
+                    audio: false
+                });
+                video.srcObject = stream;
+                video.play();
+                isPlaying = true;
+                startBtn.style.display = 'none'; // 起動後はボタンを隠す
+                
+                // 映像の再生が始まったら解析ループを開始
+                requestAnimationFrame(analyzeFrame);
             } catch (err) {
-                log("MIDI Access Failed: " + err.message);
-                alert("このブラウザはWeb MIDI APIをサポートしていないか、権限が拒否されました。");
+                alert('カメラの起動に失敗しました。権限を確認してください。\n' + err);
             }
-        }
-
-        function updateMidiOutputs() {
-            midiOutputSelect.innerHTML = '';
-            const outputs = Array.from(midiAccess.outputs.values());
-            
-            if (outputs.length === 0) {
-                midiOutputSelect.innerHTML = '<option value="">(No MIDI Outputs Found)</option>';
-                selectedMidiOutput = null;
-                return;
-            }
-
-            outputs.forEach(output => {
-                const option = document.createElement('option');
-                option.value = output.id;
-                option.text = output.name;
-                midiOutputSelect.appendChild(option);
-            });
-
-            // 最初のデバイスを選択
-            selectedMidiOutput = midiAccess.outputs.get(midiOutputSelect.value);
-        }
-
-        midiOutputSelect.addEventListener('change', (e) => {
-            selectedMidiOutput = midiAccess.outputs.get(e.target.value);
-            log("Selected MIDI Output: " + selectedMidiOutput.name);
         });
 
-        // --- 2. Web Audio API とマイクのセットアップ ---
-        async function toggleAudio() {
-            if (isRunning) {
-                stopAudio();
+        // 映像フレームごとの解析処理
+        function analyzeFrame() {
+            if (!isPlaying || video.videoWidth === 0) {
+                requestAnimationFrame(analyzeFrame);
                 return;
             }
 
-            try {
-                // ブラウザの仕様上、ユーザーアクション（クリック）時にAudioContextを作成する必要があります
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                microphone = audioContext.createMediaStreamSource(stream);
-                
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 1024; // 1024にすると512の周波数ビンが得られる
-                analyser.smoothingTimeConstant = 0.5; // 0.0〜1.0 (値が大きいほど動きが滑らかになる)
-                
-                microphone.connect(analyser);
-                
-                isRunning = true;
-                toggleBtn.textContent = "Stop";
-                log("Microphone started. Analyzing...");
-                
-                processAudio();
-            } catch (err) {
-                log("Audio Error: " + err.message);
-                alert("マイクへのアクセスが拒否されたか、エラーが発生しました。");
+            // キャンバスのサイズをビデオに合わせる
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            // ビデオの現在のフレームをキャンバスに描画
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // 画面中央の1ピクセルの色を取得（精度を上げるならループで複数ピクセルの平均を取ります）
+            const centerX = Math.floor(canvas.width / 2);
+            const centerY = Math.floor(canvas.height / 2);
+            const pixelData = ctx.getImageData(centerX, centerY, 1, 1).data;
+
+            const r = pixelData[0];
+            const g = pixelData[1];
+            const b = pixelData[2];
+
+            // RGBからHSVに変換して濃さを計算
+            const hsv = rgbToHsv(r, g, b);
+            const hue = hsv[0];        // 色相 (0〜360)
+            const saturation = hsv[1]; // 彩度 (0.0〜1.0)
+
+            // 【濃さの算出ロジック】
+            // ストレートのウイスキーの彩度を 0.8 (80%) 程度と仮定
+            const maxWhiskySaturation = 0.8;
+            let concentration = (saturation / maxWhiskySaturation) * 100;
+
+            if (concentration > 100) concentration = 100;
+
+            // 色相がオレンジ/茶色系（ざっくり10〜60度）から大きく外れている場合は0%にする
+            if (hue < 10 || hue > 60) {
+                concentration = 0;
             }
+
+            // 結果を画面に表示
+            resultDiv.innerText = `濃さ: ${concentration.toFixed(1)} %`;
+
+            // 次のフレームの処理を予約
+            requestAnimationFrame(analyzeFrame);
         }
 
-        function stopAudio() {
-            isRunning = false;
-            cancelAnimationFrame(animationId);
-            if (audioContext) {
-                audioContext.close();
-            }
-            toggleBtn.textContent = "Start Microphone & MIDI";
-            bars.forEach(bar => bar.style.height = '0%');
-            log("Stopped.");
-        }
+        // RGBをHSVに変換するヘルパー関数
+        function rgbToHsv(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const d = max - min;
+            let h = 0;
+            const s = max === 0 ? 0 : d / max;
+            const v = max;
 
-        // --- 3. 音声解析とMIDI送信ループ ---
-        function processAudio() {
-            if (!isRunning) return;
-
-            // analyser.fftSizeが1024の場合、frequencyBinCountは512になります
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-            
-            // FFT結果を 0〜255 のバイトデータとして取得
-            analyser.getByteFrequencyData(dataArray);
-
-            // 512のビンを16バンドに分割 (512 / 16 = 32ビン/バンド)
-            const binsPerBand = Math.floor(bufferLength / NUM_BANDS);
-            const bandGains = new Array(NUM_BANDS).fill(0);
-
-            for (let i = 0; i < NUM_BANDS; i++) {
-                let sum = 0;
-                const startBin = i * binsPerBand;
-                const endBin = startBin + binsPerBand;
-
-                for (let j = startBin; j < endBin; j++) {
-                    sum += dataArray[j];
+            if (max !== min) {
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
                 }
-
-                // バンド内の平均値を計算 (0〜255)
-                const avg = sum / binsPerBand;
-                
-                // MIDIの 0〜127 の範囲にマッピング (255 / 2 ≒ 127)
-                let midiValue = Math.floor(avg / 2);
-                
-                // ノイズゲート処理（小さな音は0にする）
-                if (midiValue < 5) midiValue = 0;
-
-                bandGains[i] = midiValue;
-
-                // UIのバーを更新
-                bars[i].style.height = (midiValue / 127 * 100) + '%';
+                h /= 6;
             }
-
-            // MIDI CCを送信
-            sendMidiCC(bandGains);
-
-            // 次のフレームを要求
-            animationId = requestAnimationFrame(processAudio);
+            return [h * 360, s, v];
         }
-
-        function sendMidiCC(bandGains) {
-            if (!selectedMidiOutput) return;
-
-            // コントロールチェンジのステータスバイト (0xB0 = 176)
-            const statusByte = 0xB0 | MIDI_CHANNEL;
-
-            for (let i = 0; i < NUM_BANDS; i++) {
-                const ccNumber = BASE_CC + i;
-                const value = bandGains[i];
-                
-                // [ステータス, CC番号, 値] の配列を送信
-                selectedMidiOutput.send([statusByte, ccNumber, value]);
-            }
-        }
-
-        // 初期化
-        setupMidi();
-        toggleBtn.addEventListener('click', toggleAudio);
-
     </script>
 </body>
 </html>
